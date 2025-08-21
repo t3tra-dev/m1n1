@@ -3,36 +3,42 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
-from ..asc.base import *
 from ...utils import *
+from ..asc.base import *
 
 ## DCP main endpoint
 
+
 class DCPMessage(Register64):
-    TYPE        = 3, 0
+    TYPE = 3, 0
+
 
 class DCPEp_SetShmem(DCPMessage):
-    DVA         = 63, 16
-    FLAG        = 7, 4
-    TYPE        = 3, 0, Constant(0)
+    DVA = 63, 16
+    FLAG = 7, 4
+    TYPE = 3, 0, Constant(0)
+
 
 class DCPEp_InitComplete(DCPMessage):
-    TYPE        = 3, 0, Constant(1)
+    TYPE = 3, 0, Constant(1)
+
 
 class CallContext(IntEnum):
-    CB          = 0
-    CMD         = 2
-    ASYNC       = 3
-    OOBCB       = 4
-    OOBCMD      = 6
-    OOBASYNC    = 7
+    CB = 0
+    CMD = 2
+    ASYNC = 3
+    OOBCB = 4
+    OOBCMD = 6
+    OOBASYNC = 7
+
 
 class DCPEp_Msg(DCPMessage):
-    LEN         = 63, 32
-    OFF         = 31, 16
-    CTX         = 11, 8, CallContext
-    ACK         = 6
-    TYPE        = 3, 0, Constant(2)
+    LEN = 63, 32
+    OFF = 31, 16
+    CTX = 11, 8, CallContext
+    ACK = 6
+    TYPE = 3, 0, Constant(2)
+
 
 @dataclass
 class DCPCallState:
@@ -43,6 +49,7 @@ class DCPCallState:
     out_addr: int
     out_len: int
     complete: bool = False
+
 
 class DCPCallChannel(Reloadable):
     def __init__(self, dcpep, name, buf, bufsize):
@@ -67,8 +74,14 @@ class DCPCallChannel(Reloadable):
 
         self.dcp.asc.iface.writemem(self.dcp.shmem + self.buf + self.off, data)
 
-        state = DCPCallState(off=self.off, tag=tag, in_len=in_len, in_data=data, out_len=out_len,
-                             out_addr=self.buf + self.off + 12 + in_len)
+        state = DCPCallState(
+            off=self.off,
+            tag=tag,
+            in_len=in_len,
+            in_data=data,
+            out_len=out_len,
+            out_addr=self.buf + self.off + 12 + in_len,
+        )
 
         self.off += align_up(data_size, 0x40)
         self.pending.append(state)
@@ -87,6 +100,7 @@ class DCPCallChannel(Reloadable):
 
         return out_data
 
+
 class DCPCallbackChannel(Reloadable):
     def __init__(self, dcpep, name, buf, bufsize):
         self.dcp = dcpep
@@ -99,10 +113,16 @@ class DCPCallbackChannel(Reloadable):
         data = self.dcp.asc.iface.readmem(self.dcp.shmem + self.buf + msg.OFF, msg.LEN)
         tag = data[:4][::-1].decode("ascii")
         in_len, out_len = struct.unpack("<II", data[4:12])
-        in_data = data[12:12 + in_len]
+        in_data = data[12 : 12 + in_len]
 
-        state = DCPCallState(off=msg.OFF, tag=tag, in_len=in_len, out_len=out_len,
-                             in_data=in_data, out_addr=self.buf + msg.OFF + 12 + in_len)
+        state = DCPCallState(
+            off=msg.OFF,
+            tag=tag,
+            in_len=in_len,
+            out_len=out_len,
+            in_data=in_data,
+            out_addr=self.buf + msg.OFF + 12 + in_len,
+        )
 
         self.pending.append(state)
 
@@ -164,4 +184,3 @@ class DCPEndpoint(ASCBaseEndpoint):
         self.send(DCPEp_SetShmem(DVA=self.shmem_dva))
         while not self.init_complete:
             self.asc.work()
-

@@ -1,13 +1,16 @@
 # SPDX-License-Identifier: MIT
-from ..utils import chexdump
-from ..malloc import Heap
+import textwrap
+
 from construct.core import *
+
 from ..fw.agx.channels import *
 from ..fw.agx.cmdqueue import *
 from ..fw.agx.microsequence import *
 from ..hw.uat import MemoryAttr
+from ..malloc import Heap
+from ..utils import chexdump
 from .object import *
-import textwrap
+
 
 class GPUEventManager:
     MAX_EVENTS = 128
@@ -42,9 +45,12 @@ class GPUEventManager:
                     ev = self.events[ev_id]
                     self.agx.log(f"Event fired: {ev_id}")
                     if ev is None:
-                        raise Exception("Received spurious notification for event ID {ev}")
+                        raise Exception(
+                            "Received spurious notification for event ID {ev}"
+                        )
                     ev.fire()
                     self.event_count += 1
+
 
 class GPUEvent:
     def __init__(self, ev_id):

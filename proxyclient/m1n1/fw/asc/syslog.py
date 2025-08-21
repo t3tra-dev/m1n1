@@ -1,27 +1,32 @@
 # SPDX-License-Identifier: MIT
 import struct
 
-from .base import *
 from ...utils import *
+from .base import *
 
 ## Syslog endpoint
 
+
 class SyslogMessage(Register64):
-    TYPE        = 59, 52
+    TYPE = 59, 52
+
 
 class Syslog_Init(SyslogMessage):
-    TYPE        = 59, 52, Constant(8)
-    ENTRYSIZE   = 39, 24
-    COUNT       = 15, 0
+    TYPE = 59, 52, Constant(8)
+    ENTRYSIZE = 39, 24
+    COUNT = 15, 0
+
 
 class Syslog_GetBuf(SyslogMessage):
-    TYPE        = 59, 52, Constant(1)
-    SIZE        = 51, 44
-    DVA         = 43, 0
+    TYPE = 59, 52, Constant(1)
+    SIZE = 51, 44
+    DVA = 43, 0
+
 
 class Syslog_Log(SyslogMessage):
-    TYPE        = 59, 52, Constant(5)
-    INDEX       = 7, 0
+    TYPE = 59, 52, Constant(5)
+    INDEX = 7, 0
+
 
 class ASCSysLogEndpoint(ASCBaseEndpoint):
     BASE_MESSAGE = SyslogMessage

@@ -5,31 +5,35 @@ from ..utils import *
 
 __all__ = ["SPMI"]
 
-CMD_EXT_WRITE   = 0x00
-CMD_EXT_READ    = 0x20
-CMD_EXT_WRITEL  = 0x30
-CMD_EXT_READL   = 0x38
-CMD_WRITE       = 0x40
-CMD_READ        = 0x60
-CMD_ZERO_WRITE  = 0x80
+CMD_EXT_WRITE = 0x00
+CMD_EXT_READ = 0x20
+CMD_EXT_WRITEL = 0x30
+CMD_EXT_READL = 0x38
+CMD_WRITE = 0x40
+CMD_READ = 0x60
+CMD_ZERO_WRITE = 0x80
+
 
 class R_CMD(Register32):
-    REG         = 31, 16
-    ACTIVE      = 15
-    SLAVE_ID    = 14, 8
-    CMD         = 7, 0
+    REG = 31, 16
+    ACTIVE = 15
+    SLAVE_ID = 14, 8
+    CMD = 7, 0
+
 
 class R_STATUS(Register32):
-    RX_EMPTY    = 24
-    RX_COUNT    = 23, 16
-    TX_EMPTY    = 8
-    TX_COUNT    = 7, 0
+    RX_EMPTY = 24
+    RX_COUNT = 23, 16
+    TX_EMPTY = 8
+    TX_COUNT = 7, 0
+
 
 class SPMIRegs(RegMap):
-    STATUS      = 0x00, R_STATUS
-    CMD         = 0x04, R_CMD
-    REPLY       = 0x08, Register32
-    IRQ_FLAG    = 0x80, Register32
+    STATUS = 0x00, R_STATUS
+    CMD = 0x04, R_CMD
+    REPLY = 0x08, Register32
+    IRQ_FLAG = 0x80, Register32
+
 
 class SPMI:
     def __init__(self, u, adt_path):
@@ -43,7 +47,9 @@ class SPMI:
         while not self.regs.STATUS.reg.RX_EMPTY:
             print(">", self.regs.REPLY.val)
 
-        self.regs.CMD.reg = R_CMD(REG = reg, ACTIVE=1, SLAVE_ID = slave, CMD = CMD_EXT_READL | (size - 1))
+        self.regs.CMD.reg = R_CMD(
+            REG=reg, ACTIVE=1, SLAVE_ID=slave, CMD=CMD_EXT_READL | (size - 1)
+        )
 
         buf = b""
 
@@ -55,14 +61,16 @@ class SPMI:
             buf += struct.pack("<I", v)
             left -= 4
 
-        return buf[4:4+size]
+        return buf[4 : 4 + size]
 
     def write(self, slave, reg, data):
         while not self.regs.STATUS.reg.RX_EMPTY:
             self.regs.REPLY.val
 
         size = len(data)
-        self.regs.CMD.reg = R_CMD(REG = reg, ACTIVE=1, SLAVE_ID = slave, CMD = CMD_EXT_WRITEL | (size - 1))
+        self.regs.CMD.reg = R_CMD(
+            REG=reg, ACTIVE=1, SLAVE_ID=slave, CMD=CMD_EXT_WRITEL | (size - 1)
+        )
 
         while data:
             blk = (data[:4] + b"\0\0\0")[:4]

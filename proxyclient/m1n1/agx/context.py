@@ -1,13 +1,16 @@
 # SPDX-License-Identifier: MIT
-from ..utils import chexdump
-from ..malloc import Heap
+import textwrap
+
 from construct.core import *
+
 from ..fw.agx.channels import *
 from ..fw.agx.cmdqueue import *
 from ..fw.agx.microsequence import *
 from ..hw.uat import MemoryAttr
+from ..malloc import Heap
+from ..utils import chexdump
 from .object import *
-import textwrap
+
 
 class GPUContext:
     def __init__(self, agx):
@@ -18,11 +21,11 @@ class GPUContext:
         self.verbose = False
         self.ctx = None
 
-        #self.job_list = agx.kshared.new(JobList)
-        #self.job_list.first_job = 0
-        #self.job_list.last_head = self.job_list._addr # Empty list has self as last_head
-        #self.job_list.unkptr_10 = 0
-        #self.job_list.push()
+        # self.job_list = agx.kshared.new(JobList)
+        # self.job_list.first_job = 0
+        # self.job_list.last_head = self.job_list._addr # Empty list has self as last_head
+        # self.job_list.unkptr_10 = 0
+        # self.job_list.push()
 
         self.ttbr0_base = self.u.memalign(self.agx.PAGE_SIZE, self.agx.PAGE_SIZE)
         self.p.memset32(self.ttbr0_base, 0, self.agx.PAGE_SIZE)
@@ -30,17 +33,47 @@ class GPUContext:
         self.objects = {}
 
         # 32K VA pages since buffer manager needs that
-        self.uobj = GPUAllocator(agx, "Userspace", 0x1600000000, 0x100000000, ctx=None,
-                                 guard_pages=1,
-                                 va_block=32768, nG=1, AP=0, PXN=1, UXN=1)
+        self.uobj = GPUAllocator(
+            agx,
+            "Userspace",
+            0x1600000000,
+            0x100000000,
+            ctx=None,
+            guard_pages=1,
+            va_block=32768,
+            nG=1,
+            AP=0,
+            PXN=1,
+            UXN=1,
+        )
 
-        self.gobj = GPUAllocator(agx, "GEM", 0x1500000000, 0x100000000, ctx=None,
-                                 guard_pages=1, nG=1, AP=0, PXN=1, UXN=1)
+        self.gobj = GPUAllocator(
+            agx,
+            "GEM",
+            0x1500000000,
+            0x100000000,
+            ctx=None,
+            guard_pages=1,
+            nG=1,
+            AP=0,
+            PXN=1,
+            UXN=1,
+        )
 
         self.pipeline_base = 0x1100000000
         self.pipeline_size = 1 << 32
-        self.pobj = GPUAllocator(agx, "Pipelines", self.pipeline_base + 0x10000, self.pipeline_size,
-                                 ctx=None, guard_pages=1, nG=1, AP=0, PXN=1, UXN=1)
+        self.pobj = GPUAllocator(
+            agx,
+            "Pipelines",
+            self.pipeline_base + 0x10000,
+            self.pipeline_size,
+            ctx=None,
+            guard_pages=1,
+            nG=1,
+            AP=0,
+            PXN=1,
+            UXN=1,
+        )
 
     def bind(self, ctx_id):
         self.ctx = ctx_id
@@ -48,7 +81,7 @@ class GPUContext:
         self.gobj.ctx = ctx_id
         self.pobj.ctx = ctx_id
         self.uat.bind_context(ctx_id, self.ttbr0_base)
-        self.thing = self.buf_at(0x6fffff8000, 0, 0x4000, "thing")
+        self.thing = self.buf_at(0x6FFFFF8000, 0, 0x4000, "thing")
 
     def make_stream(self, base):
         return self.uat.iostream(self.ctx, base, recurse=False)
@@ -63,10 +96,12 @@ class GPUContext:
         obj._addr = addr
 
         obj._paddr = self.agx.u.memalign(self.agx.PAGE_SIZE, size_align)
-        #if isinstance(obj.val, ConstructClassBase):
-            #obj.val._addr = obj._addr
+        # if isinstance(obj.val, ConstructClassBase):
+        # obj.val._addr = obj._addr
 
-        self.agx.log(f"[Context@{self.ctx}] Map {obj._name} size {obj._size:#x} @ {obj._addr:#x} ({obj._paddr:#x})")
+        self.agx.log(
+            f"[Context@{self.ctx}] Map {obj._name} size {obj._size:#x} @ {obj._addr:#x} ({obj._paddr:#x})"
+        )
 
         flags2 = {"AttrIndex": MemoryAttr.Shared}
         flags2.update(flags)
@@ -80,15 +115,29 @@ class GPUContext:
         return obj
 
     def buf_at(self, addr, is_pipeline, size, name=None, track=True):
-        return self.new_at(addr, Bytes(size), name, track=track,
-                           AttrIndex=MemoryAttr.Shared, PXN=1,
-                           nG=1, AP=(1 if is_pipeline else 0))
+        return self.new_at(
+            addr,
+            Bytes(size),
+            name,
+            track=track,
+            AttrIndex=MemoryAttr.Shared,
+            PXN=1,
+            nG=1,
+            AP=(1 if is_pipeline else 0),
+        )
 
     def load_blob(self, addr, is_pipeline, filename, track=True):
         data = open(filename, "rb").read()
-        obj = self.new_at(addr, Bytes(len(data)), filename, track=track,
-                          AttrIndex=MemoryAttr.Shared, PXN=1,
-                          nG=1, AP=(1 if is_pipeline else 0))
+        obj = self.new_at(
+            addr,
+            Bytes(len(data)),
+            filename,
+            track=track,
+            AttrIndex=MemoryAttr.Shared,
+            PXN=1,
+            nG=1,
+            AP=(1 if is_pipeline else 0),
+        )
         obj.val = data
         obj.push()
 
@@ -102,6 +151,7 @@ class GPUContext:
 
     def free_at(self, addr):
         self.free(self.objects[obj._addr])
+
 
 class GPUWorkQueue:
     def __init__(self, agx, scheduler_context, job_list):
@@ -120,7 +170,7 @@ class GPUWorkQueue:
         self.info.pointers = self.pointers
         self.info.rb_addr = self.ring._addr
         self.info.job_list = job_list
-        self.info.gpu_buf_addr = agx.kobj.buf(0x2c18, "GPUWorkQueue.gpu_buf")
+        self.info.gpu_buf_addr = agx.kobj.buf(0x2C18, "GPUWorkQueue.gpu_buf")
         self.info.gpu_context = scheduler_context
         self.info.push()
 
@@ -141,11 +191,14 @@ class GPUWorkQueue:
         while self.wptr != self.pmap.GPU_DONEPTR.val:
             self.agx.work()
 
+
 class GPU3DWorkQueue(GPUWorkQueue):
     TYPE = 1
 
+
 class GPUTAWorkQueue(GPUWorkQueue):
     TYPE = 0
+
 
 class GPUMicroSequence:
     def __init__(self, agx):
@@ -177,9 +230,10 @@ class GPUMicroSequence:
     def __str__(self):
         s = f"GPUMicroSequence: {len(self.ops)} ops\n"
         for i, op in enumerate(self.ops):
-            op_s = textwrap.indent(str(op), ' ' * 4)
+            op_s = textwrap.indent(str(op), " " * 4)
             s += f"[{i:2}:{op.sizeof():#x}] = {op!s}\n"
         return s
+
 
 class GPUBufferManager:
     def __init__(self, agx, context, blocks=8):
@@ -206,9 +260,15 @@ class GPUBufferManager:
 
         self.scene_max = 48
 
-        self.page_list = context.uobj.new(Array(0x10000 // 4, Int32ul), "BM PageList", track=False)
-        self.block_list = context.uobj.new(Array(0x8000 // 4, Int32ul), "BM BlockList", track=False)
-        self.scene_list = agx.kgpurw.new(Array(self.scene_max, Int32ul), "BM SceneList", track=True)
+        self.page_list = context.uobj.new(
+            Array(0x10000 // 4, Int32ul), "BM PageList", track=False
+        )
+        self.block_list = context.uobj.new(
+            Array(0x8000 // 4, Int32ul), "BM BlockList", track=False
+        )
+        self.scene_list = agx.kgpurw.new(
+            Array(self.scene_max, Int32ul), "BM SceneList", track=True
+        )
 
         self.scene_list.val = [0] * 48
         self.scene_list.push()
@@ -256,4 +316,3 @@ class GPUBufferManager:
 
             idx += 1
         self.block_ctl.wptr.val = idx
-

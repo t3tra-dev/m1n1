@@ -1,11 +1,12 @@
-from m1n1.trace import ADTDevTracer
-from m1n1.trace.dart8110 import DART8110Tracer
-from m1n1.hw.prores import *
-from m1n1.utils import *
 import struct
 
-p.pmgr_adt_clocks_enable('/arm-io/dart-apr0')
-p.pmgr_adt_clocks_enable('/arm-io/dart-apr1')
+from m1n1.hw.prores import *
+from m1n1.trace import ADTDevTracer
+from m1n1.trace.dart8110 import DART8110Tracer
+from m1n1.utils import *
+
+p.pmgr_adt_clocks_enable("/arm-io/dart-apr0")
+p.pmgr_adt_clocks_enable("/arm-io/dart-apr1")
 
 dart0_tracer = DART8110Tracer(hv, "/arm-io/dart-apr0", verbose=1)
 dart0_tracer.start()
@@ -18,7 +19,7 @@ print(dart1_tracer)
 class ProResTracer(ADTDevTracer):
     DEFAULT_MODE = TraceMode.SYNC
     REGMAPS = [ProResRegs]
-    NAMES = ['prores']
+    NAMES = ["prores"]
 
     def __init__(self, hv, devpath, dart_tracer):
         super().__init__(hv, devpath, verbose=3)
@@ -54,7 +55,9 @@ class ProResTracer(ADTDevTracer):
         dr_tail = int(self._dr_tail)
 
         if dr_head - dr_tail == 0x180:
-            desc = EncodeNotRawDescriptor._make(struct.unpack(ENCODE_NOT_RAW_STRUCT, dr[dr_tail:dr_head]))
+            desc = EncodeNotRawDescriptor._make(
+                struct.unpack(ENCODE_NOT_RAW_STRUCT, dr[dr_tail:dr_head])
+            )
             print(desc)
 
             p0_iova = desc.luma_iova
@@ -77,12 +80,12 @@ class ProResTracer(ADTDevTracer):
 
 ProResTracer = ProResTracer._reloadcls()
 
-p.pmgr_adt_clocks_enable('/arm-io/apr0')
-p.pmgr_adt_clocks_enable('/arm-io/apr1')
+p.pmgr_adt_clocks_enable("/arm-io/apr0")
+p.pmgr_adt_clocks_enable("/arm-io/apr1")
 
-tracer0 = ProResTracer(hv, '/arm-io/apr0', dart0_tracer)
+tracer0 = ProResTracer(hv, "/arm-io/apr0", dart0_tracer)
 tracer0.start()
 print(tracer0)
-tracer1 = ProResTracer(hv, '/arm-io/apr1', dart1_tracer)
+tracer1 = ProResTracer(hv, "/arm-io/apr1", dart1_tracer)
 tracer1.start()
 print(tracer1)

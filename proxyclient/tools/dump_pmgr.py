@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
-from m1n1 import adt
-from m1n1.setup import *
 from m1n1.hw.nco import NCO
+from m1n1.setup import *
+
+from m1n1 import adt
 
 dt = u.adt
 
@@ -22,12 +25,14 @@ for i, r in enumerate(pmgr.ps_regs):
 print()
 print("=== Perf Regs ===")
 for i, r in enumerate(pmgr.perf_regs):
-    print(f" #{i:2d} reg: {r.reg} off: {r.offset:05x} size:{r.size:05x} unk:{r.unk:08x}")
+    print(
+        f" #{i:2d} reg: {r.reg} off: {r.offset:05x} size:{r.size:05x} unk:{r.unk:08x}"
+    )
 
-#print()
-#print("=== PWR Gate Regs ===")
-#for i, r in enumerate(pmgr.pwrgate_regs):
-    #print(f" #{i:2d} reg: {r.reg} off: {r.offset:05x} mask:{r.mask:08x} unk:{r.unk:08x}")
+# print()
+# print("=== PWR Gate Regs ===")
+# for i, r in enumerate(pmgr.pwrgate_regs):
+# print(f" #{i:2d} reg: {r.reg} off: {r.offset:05x} mask:{r.mask:08x} unk:{r.unk:08x}")
 
 clock_users = {}
 dev_users = {}
@@ -48,7 +53,9 @@ print("=== Devices ===")
 for i, dev in enumerate(pmgr.devices):
     flags = ", ".join(k for k in dev.flags if k[0] != "_" and dev.flags[k])
     s = f" #{i:3d} {dev.name:20s} id: {u.adt.pmgr_dev_get_id(dev):3d} psreg: {dev.psreg:2d}:{dev.psidx:2d} "
-    s += f" flags: {flags:24s} unk1_0: {dev.unk1_0} unk1_1: {dev.unk1_1} id1: {dev.id1} "
+    s += (
+        f" flags: {flags:24s} unk1_0: {dev.unk1_0} unk1_1: {dev.unk1_1} id1: {dev.id1} "
+    )
     s += f" perf_reg: {dev.perf_block}:{dev.perf_idx:#04x} unk3: {dev.unk3:3d} {dev.unk2_0:2d} {dev.ps_cfg16:2d} {dev.unk2_3:3d}"
 
     if not dev.flags.no_ps:
@@ -64,7 +71,11 @@ for i, dev in enumerate(pmgr.devices):
     else:
         s += "                         "
     if any(dt.pmgr_dev_get_parents(dev)):
-        s += " parents: " + ", ".join(dev_by_id[idx].name if idx in dev_by_id else f"#{idx}" for idx in dt.pmgr_dev_get_parents(dev) if idx)
+        s += " parents: " + ", ".join(
+            dev_by_id[idx].name if idx in dev_by_id else f"#{idx}"
+            for idx in dt.pmgr_dev_get_parents(dev)
+            if idx
+        )
     print(s)
     for i in dev_users.get(dt.pmgr_dev_get_id(dev), []):
         print(f"  User: {i}")
@@ -74,14 +85,18 @@ print("=== Clocks ===")
 for i, clk in enumerate(pmgr.clocks):
     perf = pmgr.perf_regs[clk.perf_block]
     reg = pmgr.get_reg(perf.reg)[0] + 0x100 + clk.perf_idx * 0x10
-    print(f" #{i:3d} {clk.name:20s} id: {clk.id:3d} reg:{clk.perf_block}:{clk.perf_idx:#4x} ({reg:#x}) {clk.unk:#x}")
+    print(
+        f" #{i:3d} {clk.name:20s} id: {clk.id:3d} reg:{clk.perf_block}:{clk.perf_idx:#4x} ({reg:#x}) {clk.unk:#x}"
+    )
 
 print()
 print("=== Power Domains ===")
 for i, pd in enumerate(pmgr.power_domains):
     perf = pmgr.perf_regs[pd.perf_block]
     reg = pmgr.get_reg(perf.reg)[0] + 0x100 + pd.perf_idx * 0x10
-    print(f" #{i:3d} {pd.name:20s} id: {pd.id:3d} reg:{pd.perf_block}:{pd.perf_idx:#4x} ({reg:#x})")
+    print(
+        f" #{i:3d} {pd.name:20s} id: {pd.id:3d} reg:{pd.perf_block}:{pd.perf_idx:#4x} ({reg:#x})"
+    )
 
 print()
 print("=== Events ===")
@@ -112,19 +127,23 @@ if chip_id in (0x8960, 0x7000, 0x7001, 0x8000, 0x8001, 0x8003, 0x8010, 0x8012, 0
     exit(0)
 
 print("=== Boot clocks ===")
-for i, (freq, reg, nclk) in enumerate(zip(arm_io.clock_frequencies,
-                                          arm_io.clock_frequencies_regs,
-                                          arm_io.clock_frequencies_nclk)):
+for i, (freq, reg, nclk) in enumerate(
+    zip(
+        arm_io.clock_frequencies,
+        arm_io.clock_frequencies_regs,
+        arm_io.clock_frequencies_nclk,
+    )
+):
     v = ""
     clk_type = reg >> 56
     reg = reg & 0xFFFFFFFFFFFFFF
-    
-    if clk_type == 0x9c:
+
+    if clk_type == 0x9C:
         v = f"fixed: {reg}"
-    elif clk_type in (0xa0, 0xa1, 0xa4, 0xa5):
+    elif clk_type in (0xA0, 0xA1, 0xA4, 0xA5):
         v = f"regval: {p.read32(reg):#x}"
-    elif clk_type == 0xa8:
-        regvals = [p.read32(reg+off*4) for off in range(5)]
+    elif clk_type == 0xA8:
+        regvals = [p.read32(reg + off * 4) for off in range(5)]
         try:
             # we are using the freq value from ADT as fin of NCO,
             # that's not exactly correct
@@ -135,8 +154,7 @@ for i, (freq, reg, nclk) in enumerate(zip(arm_io.clock_frequencies,
         v = f"nco: (calculated rate: {nco_freq:d}) "
         for val in regvals:
             v += f"{val:#x} "
-        
-    
+
     print(f"#{i:3}: {freq:10d} {nclk} {clk_type:#x}/{reg:#x}: {v}")
     for j in clock_users.get(i + 256, []):
         print(f"  User: {j}")

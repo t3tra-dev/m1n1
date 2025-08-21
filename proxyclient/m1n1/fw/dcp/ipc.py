@@ -1,41 +1,54 @@
 # SPDX-License-Identifier: MIT
 
-from dataclasses import dataclass
 import pprint
+from dataclasses import dataclass
 from enum import IntEnum
 
-from ..common import *
-from m1n1.utils import *
 from construct import *
 from m1n1.constructutils import Ver
+from m1n1.utils import *
+
+from ..common import *
+
 
 @dataclass
 class ByRef:
     val: object
 
+
 class Pointer(Subconstruct):
     pass
+
 
 class InPtr(Pointer):
     pass
 
+
 class OutPtr(Pointer):
     pass
+
 
 class InOutPtr(Pointer):
     pass
 
+
 class InOut(Subconstruct):
     pass
 
+
 Ptr = InOutPtr
+
 
 class NULL:
     def __str__(self):
         return "NULL"
+
     def __repr__(self):
         return "NULL"
+
+
 NULL = NULL()
+
 
 class Method:
     def __init__(self, rtype, name, *args, **kwargs):
@@ -88,17 +101,17 @@ class Method:
                 align = min(4, pfield.length)
 
             if dir in ("in", "inout"):
-                #if in_size % align:
-                    #self.in_fields.append(Padding(align - (in_size % align)))
-                    #in_size += align - (in_size % align)
+                # if in_size % align:
+                # self.in_fields.append(Padding(align - (in_size % align)))
+                # in_size += align - (in_size % align)
 
                 self.in_fields.append(name / field)
                 in_size += field.sizeof()
 
             if dir in ("out", "inout"):
-                #if out_size % align:
-                    #self.out_fields.append(Padding(align - (out_size % align)))
-                    #out_size += align - (out_size % align)
+                # if out_size % align:
+                # self.out_fields.append(Padding(align - (out_size % align)))
+                # out_size += align - (out_size % align)
 
                 self.out_fields.append(name / field)
                 out_size += field.sizeof()
@@ -212,7 +225,12 @@ class Method:
                     dindent = " " * len(hdr)
                     if isinstance(val, dict) and "_io" in val:
                         del val["_io"]
-                    print(hdr + pprint.pformat(val, sort_dicts=False).replace("\n", "\n" + dindent))
+                    print(
+                        hdr
+                        + pprint.pformat(val, sort_dicts=False).replace(
+                            "\n", "\n" + dindent
+                        )
+                    )
 
     def is_long(self, arg):
         if isinstance(arg, (list, bytes)):
@@ -223,7 +241,7 @@ class Method:
     def parse_input(self, data):
         vals = self.in_struct.parse(data)
 
-        return Container({ k: v() if callable(v) else v for k,v in vals.items() })
+        return Container({k: v() if callable(v) else v for k, v in vals.items()})
 
     def parse_output(self, data, in_vals):
         context = dict(in_vals)
@@ -233,7 +251,7 @@ class Method:
 
         vals = self.out_struct.parse(data, **context)
 
-        return Container({ k: v() if callable(v) else v for k,v in vals.items() })
+        return Container({k: v() if callable(v) else v for k, v in vals.items()})
 
     def __str__(self):
         if self.rtype is None:
@@ -289,7 +307,9 @@ class Method:
             assert retval is not None
             out_vals["ret"] = retval
 
-        out_vals = {k: v.val if isinstance(v, ByRef) else v for k, v in out_vals.items()}
+        out_vals = {
+            k: v.val if isinstance(v, ByRef) else v for k, v in out_vals.items()
+        }
 
         context = dict(in_vals)
 
@@ -298,7 +318,6 @@ class Method:
 
         out_data = self.out_struct.build(out_vals, **context)
         return out_data
-
 
     def call(self, call, *args, **kwargs):
         if args and kwargs:
@@ -326,7 +345,9 @@ class Method:
                 else:
                     defaults = field.parse(b"\x00" * field.sizeof())
                     in_vals[name + "_null"] = [i is None for i in val]
-                    val = [v if v is not None else defaults[i] for i, v in enumerate(val)]
+                    val = [
+                        v if v is not None else defaults[i] for i, v in enumerate(val)
+                    ]
             else:
                 assert val is not None
 
@@ -357,6 +378,7 @@ class Method:
         if self.rtype is not None:
             return out_vals["ret"]
 
+
 def dump_fields(fields):
     off = 0
     for f in fields:
@@ -364,11 +386,14 @@ def dump_fields(fields):
         print(f"{off:#x}: {f} ({sizeof:#x})")
         off += sizeof
 
+
 class Call(Method):
     pass
 
+
 class Callback(Method):
     pass
+
 
 int8_t = Int8sl
 uint8_t = Int8ul
@@ -386,14 +411,18 @@ long_ = int64_t
 
 void = None
 
+
 class IPCObject:
     @classmethod
     def methods(cls):
         ret = {}
         for c in cls.mro():
-            ret.update({k: (cls, v) for k, v in cls.__dict__.items() if isinstance(v, Method)})
+            ret.update(
+                {k: (cls, v) for k, v in cls.__dict__.items() if isinstance(v, Method)}
+            )
 
         return ret
+
 
 rt_bw_config_t = Struct(
     "unk1" / UnkBytes(8),
@@ -401,7 +430,7 @@ rt_bw_config_t = Struct(
     "reg2" / Int64ul,
     "unk2" / UnkBytes(4),
     "bit" / Int32ul,
-    "padding" / UnkBytes(0x1c),
+    "padding" / UnkBytes(0x1C),
 )
 
 frame_sync_props_t = Struct(
@@ -413,7 +442,7 @@ IOUserClient = Struct(
     "unk" / Int32ul,
     "flag1" / Int8ul,
     "flag2" / Int8ul,
-    Padding(2)
+    Padding(2),
 )
 
 IOMobileFramebufferUserClient = IOUserClient
@@ -425,7 +454,7 @@ BufferDescriptor = uint64_t
 
 SwapCompleteData = Bytes(0x12)
 SwapInfoBlob = Struct(
-    "unk" / Bytes(0x6c4),
+    "unk" / Bytes(0x6C4),
     Ver("V >= V13_5", "unk_13_3" / Bytes(0x10)),
 )
 
@@ -456,18 +485,20 @@ IOMFBSwapRec = Struct(
     "swap_completed" / Hex(Int32ul),
     "bg_color" / Hex(Default(Int32ul, 0)),
     "unk_110" / UnkBytes(0x30),
-    "active_region_enable" / Default(Int32ul[SWAP_SURFACES], [0]*SWAP_SURFACES),
-    "active_regions" / Default(ActiveRegion[SWAP_SURFACES], [(0,0,0,0)] * SWAP_SURFACES),
+    "active_region_enable" / Default(Int32ul[SWAP_SURFACES], [0] * SWAP_SURFACES),
+    "active_regions"
+    / Default(ActiveRegion[SWAP_SURFACES], [(0, 0, 0, 0)] * SWAP_SURFACES),
     "unk_190" / UnkBytes(0x138),
     "unk_2c8" / Hex(Default(Int32ul, 0)),
     "unk_2cc" / UnkBytes(0x14),
     "unk_2e0" / Hex(Default(Int32ul, 0)),
     Ver("V < V13_5", "unk_2e2" / UnkBytes(0x2)),
     Ver("V >= V13_5", "unk_2e2" / UnkBytes(0x3)),
-    "bl_unk" / Hex(Int64ul), # seen: 0x0, 0x1, 0x101, 0x1_0000, 0x101_010101
-    "bl_val" / Hex(Int32ul), # range 0x10000000 - approximately 0x7fe07fc0 for 4 - 510 nits
-    "bl_power" / Hex(Int8ul), # constant 0x40, 0x00: backlight off
-    "unk_2f3" / UnkBytes(0x2d),
+    "bl_unk" / Hex(Int64ul),  # seen: 0x0, 0x1, 0x101, 0x1_0000, 0x101_010101
+    "bl_val"
+    / Hex(Int32ul),  # range 0x10000000 - approximately 0x7fe07fc0 for 4 - 510 nits
+    "bl_power" / Hex(Int8ul),  # constant 0x40, 0x00: backlight off
+    "unk_2f3" / UnkBytes(0x2D),
     Ver("V >= V13_5", "unk_320" / UnkBytes(0x147)),
 )
 
@@ -478,7 +509,7 @@ ComponentTypes = Struct(
     "types" / SizedArray(7, "count", Int8ul),
 )
 
-#ComponentTypes = Bytes(8)
+# ComponentTypes = Bytes(8)
 
 CLA_Chroma = 0
 CLA_Luma = 1
@@ -519,7 +550,7 @@ PlaneInfo = Struct(
     "tile_size" / Int16ul,
     "tile_w" / Int8ul,
     "tile_h" / Int8ul,
-    "unk1" / UnkBytes(0xd),
+    "unk1" / UnkBytes(0xD),
     "unk2" / Hex(Int8ul),
     "unk3" / UnkBytes(0x26),
 )
@@ -570,7 +601,8 @@ IOSurface = Struct(
     "has_comp" / Bool(Int64ul),
     "planes" / Default(SizedArray(MAX_PLANES, "plane_cnt", PlaneInfo), []),
     "has_planes" / Bool(Int64ul),
-    "compression_info" / Default(SizedArray(MAX_PLANES, "plane_cnt", CompressionInfo), []),
+    "compression_info"
+    / Default(SizedArray(MAX_PLANES, "plane_cnt", CompressionInfo), []),
     "has_compr_info" / Bool(Int64ul),
     "unk_1f5" / Int32ul,
     "unk_1f9" / Int32ul,
@@ -580,24 +612,32 @@ IOSurface = Struct(
 
 IOMFBColorFixedMatrix = Array(5, Array(3, ulong))
 
+
 class PropID(IntEnum):
     BrightnessCorrection = 14
+
 
 class UPPipeAP_H13P(IPCObject):
     # FW version dependent Calls
     if Ver.check("V < V13_5"):
         late_init_signal = Call(bool_, "late_init_signal")
-        update_notify_clients_dcp = Call(void, "update_notify_clients_dcp", Array(26, uint))
+        update_notify_clients_dcp = Call(
+            void, "update_notify_clients_dcp", Array(26, uint)
+        )
     else:
         late_init_signal = Call(bool_, "late_init_signal", bool_)
-        update_notify_clients_dcp = Call(void, "update_notify_clients_dcp", Array(26, uint))
+        update_notify_clients_dcp = Call(
+            void, "update_notify_clients_dcp", Array(26, uint)
+        )
 
     A000 = late_init_signal
     A029 = Call(void, "setup_video_limits")
     A034 = update_notify_clients_dcp
     A035 = Call(bool_, "is_hilo")
     A036 = Call(bool_, "apt_supported")
-    A037 = Call(uint, "get_dfb_info", InOutPtr(uint), InOutPtr(Array(4, ulong)), InOutPtr(uint))
+    A037 = Call(
+        uint, "get_dfb_info", InOutPtr(uint), InOutPtr(Array(4, ulong)), InOutPtr(uint)
+    )
     A038 = Call(uint, "get_dfb_compression_info", InOutPtr(uint))
 
     D000 = Callback(bool_, "did_boot_signal")
@@ -606,7 +646,9 @@ class UPPipeAP_H13P(IPCObject):
     D003 = Callback(void, "rt_bandwidth_setup_ap", config=OutPtr(rt_bw_config_t))
     D006 = Callback(void, "set_frame_sync_props", props=InOutPtr(frame_sync_props_t))
 
+
 IdleCachingState = uint32_t
+
 
 class UnifiedPipeline2(IPCObject):
     # FW version dependent Call tags
@@ -629,7 +671,9 @@ class UnifiedPipeline2(IPCObject):
 
     # FW version dependent Callback tags
 
-    cb_set_boolean_property = Callback(void, "set_boolean_property", key=string(0x40), value=bool_)
+    cb_set_boolean_property = Callback(
+        void, "set_boolean_property", key=string(0x40), value=bool_
+    )
     cb_removeProperty = Callback(void, "removeProperty", key=string(0x40))
     cb_create_provider_service = Callback(bool_, "create_provider_service")
     cb_create_product_service = Callback(bool_, "create_product_service")
@@ -638,15 +682,31 @@ class UnifiedPipeline2(IPCObject):
     cb_create_backlight_service = Callback(bool_, "create_backlight_service")
 
     cb_create_nvram_service = Callback(bool_, "create_nvram_service")
-    cb_set_idle_caching_state_ap = Callback(void, "set_idle_caching_state_ap", IdleCachingState, uint)
+    cb_set_idle_caching_state_ap = Callback(
+        void, "set_idle_caching_state_ap", IdleCachingState, uint
+    )
     cb_start_hardware_boot = Callback(bool_, "start_hardware_boot")
     cb_is_dark_boot = Callback(bool_, "is_dark_boot")
     cb_is_waking_from_hibernate = Callback(bool_, "is_waking_from_hibernate")
-    cb_read_edt_data = Callback(bool_, "read_edt_data", key=string(0x40), count=uint, value=InOut(Lazy(SizedArray(8, "count", uint32_t))))
+    cb_read_edt_data = Callback(
+        bool_,
+        "read_edt_data",
+        key=string(0x40),
+        count=uint,
+        value=InOut(Lazy(SizedArray(8, "count", uint32_t))),
+    )
     cb_setDCPAVPropStart = Callback(bool_, "setDCPAVPropStart", length=uint)
-    cb_setDCPAVPropChunk = Callback(bool_, "setDCPAVPropChunk", data=HexDump(SizedBytes(0x1000, "length")), offset=uint, length=uint)
+    cb_setDCPAVPropChunk = Callback(
+        bool_,
+        "setDCPAVPropChunk",
+        data=HexDump(SizedBytes(0x1000, "length")),
+        offset=uint,
+        length=uint,
+    )
     cb_setDCPAVPropEnd = Callback(bool_, "setDCPAVPropEnd", key=string(0x40))
-    cb_allocate_bandwidth = Callback(bool_, "allocate_badwidth", InOutPtr(ulong), InOutPtr(ulong), ulong)
+    cb_allocate_bandwidth = Callback(
+        bool_, "allocate_badwidth", InOutPtr(ulong), InOutPtr(ulong), ulong
+    )
 
     if Ver.check("V < V13_5"):
         D103 = cb_set_boolean_property
@@ -674,8 +734,12 @@ class UnifiedPipeline2(IPCObject):
         D111 = cb_create_iomfb_service
         D112 = cb_create_backlight_service
         D113 = cb_create_nvram_service
-        D114 = Callback(bool_, "get_tiling_state", event=uint, para=uint, val=InOutPtr(uint))
-        D115 = Callback(bool_, "set_tiling_state", event=uint, para=uint, val=InPtr(uint))
+        D114 = Callback(
+            bool_, "get_tiling_state", event=uint, para=uint, val=InOutPtr(uint)
+        )
+        D115 = Callback(
+            bool_, "set_tiling_state", event=uint, para=uint, val=InPtr(uint)
+        )
         D116 = cb_set_idle_caching_state_ap
         D120 = cb_start_hardware_boot
         D121 = cb_is_dark_boot
@@ -686,9 +750,12 @@ class UnifiedPipeline2(IPCObject):
         D128 = cb_setDCPAVPropEnd
         D129 = cb_allocate_bandwidth
 
+
 class UPPipe2(IPCObject):
     A102 = Call(uint64_t, "test_control", cmd=uint64_t, arg=uint)
-    A103 = Call(void, "get_config_frame_size", width=InOutPtr(uint), height=InOutPtr(uint))
+    A103 = Call(
+        void, "get_config_frame_size", width=InOutPtr(uint), height=InOutPtr(uint)
+    )
     A104 = Call(void, "set_config_frame_size", width=uint, height=uint)
     A105 = Call(void, "program_config_frame_size")
     A130 = Call(bool_, "init_ca_pmu")
@@ -697,10 +764,21 @@ class UPPipe2(IPCObject):
 
     # FW version dependent Callback tags
     cb_get_calendar_time_ms = Callback(uint64_t, "get_calendar_time_ms")
-    cb_update_backlight_factor_prop = Callback(void, "update_backlight_factor_prop", int_)
+    cb_update_backlight_factor_prop = Callback(
+        void, "update_backlight_factor_prop", int_
+    )
 
-    D201 = Callback(uint32_t, "map_buf", buf=InPtr(BufferDescriptor), vaddr=OutPtr(ulong), dva=OutPtr(ulong), unk=bool_)
-    D202 = Callback(void, "unmap_buf", buf=InPtr(BufferDescriptor), unk1=uint, unk2=ulong, unkB=uint)
+    D201 = Callback(
+        uint32_t,
+        "map_buf",
+        buf=InPtr(BufferDescriptor),
+        vaddr=OutPtr(ulong),
+        dva=OutPtr(ulong),
+        unk=bool_,
+    )
+    D202 = Callback(
+        void, "unmap_buf", buf=InPtr(BufferDescriptor), unk1=uint, unk2=ulong, unkB=uint
+    )
 
     D206 = Callback(bool_, "match_pmu_service_2")
     D207 = Callback(bool_, "match_backlight_service")
@@ -712,42 +790,54 @@ class UPPipe2(IPCObject):
         D208 = cb_update_backlight_factor_prop
         D209 = cb_get_calendar_time_ms
 
+
 class PropRelay(IPCObject):
     if Ver.check("V < V13_5"):
         D300 = Callback(void, "pr_publish", prop_id=uint32_t, value=int_)
     else:
-        D300 = Callback(void, "pr_publish", prop_id=uint32_t, value=int_, unk0=int_, unk1=int_)
+        D300 = Callback(
+            void, "pr_publish", prop_id=uint32_t, value=int_, unk0=int_, unk1=int_
+        )
+
 
 class IOMobileFramebufferAP(IPCObject):
     # FW version dependent Calls
     if Ver.check("V < V13_5"):
-        swap_submit_dcp = Call(uint32_t, "swap_submit_dcp",
-                 swap_rec=InPtr(IOMFBSwapRec),
-                 surfaces=Array(4, InPtr(IOSurface)),
-                 surfAddr=Array(4, Hex(ulong)),
-                 unkBool=bool_,
-                 unkFloat=Float64l,
-                 unkInt=uint,
-                 unkOutBool=OutPtr(bool_))
+        swap_submit_dcp = Call(
+            uint32_t,
+            "swap_submit_dcp",
+            swap_rec=InPtr(IOMFBSwapRec),
+            surfaces=Array(4, InPtr(IOSurface)),
+            surfAddr=Array(4, Hex(ulong)),
+            unkBool=bool_,
+            unkFloat=Float64l,
+            unkInt=uint,
+            unkOutBool=OutPtr(bool_),
+        )
     else:
-        swap_submit_dcp = Call(uint32_t, "swap_submit_dcp",
-                swap_rec=InPtr(IOMFBSwapRec),
-                surfaces=Array(SWAP_SURFACES, InPtr(IOSurface)),
-                surfAddr=Array(SWAP_SURFACES, Hex(ulong)),
-                unkU64Array=Array(SWAP_SURFACES, Hex(ulong)),
-                surfaces2=Array(5, InPtr(IOSurface)),
-                surfAddr2=Array(5, Hex(ulong)),
-                unkBool=bool_,
-                unkFloat=Float64l,
-                unkU64=ulong,
-                unkBool2=bool_,
-                unkInt=uint,
-                unkOutBool=OutPtr(bool_),
-                unkCUintArray=InPtr(uint),
-                unkUintPtr=OutPtr(uint))
+        swap_submit_dcp = Call(
+            uint32_t,
+            "swap_submit_dcp",
+            swap_rec=InPtr(IOMFBSwapRec),
+            surfaces=Array(SWAP_SURFACES, InPtr(IOSurface)),
+            surfAddr=Array(SWAP_SURFACES, Hex(ulong)),
+            unkU64Array=Array(SWAP_SURFACES, Hex(ulong)),
+            surfaces2=Array(5, InPtr(IOSurface)),
+            surfAddr2=Array(5, Hex(ulong)),
+            unkBool=bool_,
+            unkFloat=Float64l,
+            unkU64=ulong,
+            unkBool2=bool_,
+            unkInt=uint,
+            unkOutBool=OutPtr(bool_),
+            unkCUintArray=InPtr(uint),
+            unkUintPtr=OutPtr(uint),
+        )
 
     A401 = Call(uint32_t, "start_signal")
-    A407 = Call(uint32_t, "swap_start", swap_id=InOutPtr(uint), client=InOutPtr(IOUserClient))
+    A407 = Call(
+        uint32_t, "swap_start", swap_id=InOutPtr(uint), client=InOutPtr(IOUserClient)
+    )
     A408 = swap_submit_dcp
     A410 = Call(uint32_t, "set_display_device", uint)
     A411 = Call(bool_, "is_main_display")
@@ -755,23 +845,58 @@ class IOMobileFramebufferAP(IPCObject):
     A412 = Call(uint32_t, "set_digital_out_mode", uint, uint)
     A413 = Call(uint32_t, "get_digital_out_state", InOutPtr(uint))
     A414 = Call(uint32_t, "get_display_area", InOutPtr(ulong))
-    A419 = Call(uint32_t, "get_gamma_table", InOutPtr(Bytes(0xc0c)))
+    A419 = Call(uint32_t, "get_gamma_table", InOutPtr(Bytes(0xC0C)))
     A422 = Call(uint32_t, "set_matrix", uint, InPtr(Array(3, Array(3, ulong))))
     A423 = Call(uint32_t, "set_contrast", InOutPtr(Float32l))
     A426 = Call(uint32_t, "get_color_remap_mode", InOutPtr(uint32_t))
     A427 = Call(uint32_t, "setBrightnessCorrection", uint)
 
     # FW version dependent Call tags
-    set_block_dcp = Call(uint32_t, "set_block_dcp", arg1=uint64_t, arg2=uint, arg3=uint, arg4=Array(8, ulong), arg5=uint, data=SizedBytes(0x1000, "length"), length=ulong, unknArry=Array(4, uint))
-    get_block_dcp = Call(uint32_t, "get_block_dcp", arg1=uint64_t, arg2=uint, arg3=uint, arg4=Array(8, ulong), arg5=uint, data=OutPtr(SizedBytes(0x1000, "length")), length=uint)
-    swap_set_color_matrix = Call(uint32_t, "swap_set_color_matrix", matrix=InOutPtr(IOMFBColorFixedMatrix), func=uint32_t, unk=uint)
-    set_parameter_dcp = Call(uint32_t, "set_parameter_dcp", param=IOMFBParameterName, value=Lazy(SizedArray(4, "count", ulong)), count=uint)
+    set_block_dcp = Call(
+        uint32_t,
+        "set_block_dcp",
+        arg1=uint64_t,
+        arg2=uint,
+        arg3=uint,
+        arg4=Array(8, ulong),
+        arg5=uint,
+        data=SizedBytes(0x1000, "length"),
+        length=ulong,
+        unknArry=Array(4, uint),
+    )
+    get_block_dcp = Call(
+        uint32_t,
+        "get_block_dcp",
+        arg1=uint64_t,
+        arg2=uint,
+        arg3=uint,
+        arg4=Array(8, ulong),
+        arg5=uint,
+        data=OutPtr(SizedBytes(0x1000, "length")),
+        length=uint,
+    )
+    swap_set_color_matrix = Call(
+        uint32_t,
+        "swap_set_color_matrix",
+        matrix=InOutPtr(IOMFBColorFixedMatrix),
+        func=uint32_t,
+        unk=uint,
+    )
+    set_parameter_dcp = Call(
+        uint32_t,
+        "set_parameter_dcp",
+        param=IOMFBParameterName,
+        value=Lazy(SizedArray(4, "count", ulong)),
+        count=uint,
+    )
     display_width = Call(uint, "display_width")
     display_height = Call(uint, "display_height")
     get_display_size = Call(void, "get_display_size", OutPtr(uint), OutPtr(uint))
     do_create_default_frame_buffer = Call(int_, "do_create_default_frame_buffer")
     printRegs = Call(void, "printRegs")
-    enable_disable_video_power_savings = Call(int_, "enable_disable_video_power_savings", uint)
+    enable_disable_video_power_savings = Call(
+        int_, "enable_disable_video_power_savings", uint
+    )
     first_client_open = Call(void, "first_client_open")
     last_client_close_dcp = Call(void, "last_client_close_dcp", OutPtr(uint))
     writeDebugInfo = Call(bool_, "writeDebugInfo", ulong)
@@ -779,7 +904,9 @@ class IOMobileFramebufferAP(IPCObject):
     io_fence_notify = Call(bool_, "io_fence_notify", uint, uint, ulong, IOMFBStatus)
     setDisplayRefreshProperties = Call(bool_, "setDisplayRefreshProperties")
     flush_supportsPower = Call(void, "flush_supportsPower", bool_)
-    abort_swaps_dcp = Call(uint, "abort_swaps_dcp", InOutPtr(IOMobileFramebufferUserClient))
+    abort_swaps_dcp = Call(
+        uint, "abort_swaps_dcp", InOutPtr(IOMobileFramebufferUserClient)
+    )
     update_dfb = Call(uint, "update_dfb", surf=InPtr(IOSurface))
     setPowerState = Call(uint32_t, "setPowerState", ulong, bool_, OutPtr(uint))
     isKeepOnScreen = Call(bool_, "isKeepOnScreen")
@@ -835,12 +962,26 @@ class IOMobileFramebufferAP(IPCObject):
         hotPlug_notify_gated = Callback(void, "hotPlug_notify_gated", ulong)
     else:
         # TODO: is this sensible?
-        hotPlug_notify_gated = Callback(void, "hotPlug_notify_gated", uint, InOutPtr(Bytes(0x4c)))
+        hotPlug_notify_gated = Callback(
+            void, "hotPlug_notify_gated", uint, InOutPtr(Bytes(0x4C))
+        )
 
-    D552 = Callback(bool_, "setProperty_dict", key=string(0x40), value=InPtr(Padded(0x1000, OSDictionary())))
-    D561 = Callback(bool_, "setProperty_dict", key=string(0x40), value=InPtr(Padded(0x1000, OSDictionary())))
+    D552 = Callback(
+        bool_,
+        "setProperty_dict",
+        key=string(0x40),
+        value=InPtr(Padded(0x1000, OSDictionary())),
+    )
+    D561 = Callback(
+        bool_,
+        "setProperty_dict",
+        key=string(0x40),
+        value=InPtr(Padded(0x1000, OSDictionary())),
+    )
     D563 = Callback(bool_, "setProperty_int", key=string(0x40), value=InPtr(uint64_t))
-    D565 = Callback(bool_, "setProperty_bool", key=string(0x40), value=InPtr(Bool(uint32_t)))
+    D565 = Callback(
+        bool_, "setProperty_bool", key=string(0x40), value=InPtr(Bool(uint32_t))
+    )
     D567 = Callback(bool_, "setProperty_str", key=string(0x40), value=string(0x40))
 
     D574 = Callback(IOMFBStatus, "powerUpDART", bool_)
@@ -857,9 +998,25 @@ class IOMobileFramebufferAP(IPCObject):
     D584 = Callback(void, "clear_default_surface")
 
     D588 = Callback(void, "resize_default_fb_surface_gated")
-    D589 = Callback(void, "swap_complete_ap_gated", swap_id=uint, unkBool=bool_, swap_data=InPtr(SwapCompleteData), swap_info=SwapInfoBlob, unkUint=uint)
+    D589 = Callback(
+        void,
+        "swap_complete_ap_gated",
+        swap_id=uint,
+        unkBool=bool_,
+        swap_data=InPtr(SwapCompleteData),
+        swap_info=SwapInfoBlob,
+        unkUint=uint,
+    )
 
-    D591 = Callback(void, "swap_complete_intent_gated", swap_id=uint, unkB=bool_, unkInt=uint32_t, width=uint, height=uint)
+    D591 = Callback(
+        void,
+        "swap_complete_intent_gated",
+        swap_id=uint,
+        unkB=bool_,
+        unkInt=uint32_t,
+        width=uint,
+        height=uint,
+    )
     D592 = Callback(void, "abort_swap_ap_gated", swap_id=uint)
     D593 = Callback(void, "enable_backlight_message_ap_gated", bool_)
     D594 = Callback(void, "setSystemConsoleMode", bool_)
@@ -868,32 +1025,102 @@ class IOMobileFramebufferAP(IPCObject):
     D597 = Callback(bool_, "preserveContents")
     D598 = Callback(void, "find_swap_function_gated")
 
+
 class ServiceRelay(IPCObject):
     # FW version dependent Callbacks
     if Ver.check("V < V13_5"):
-        sr_mapDeviceMemoryWithIndex = Callback(IOMFBStatus, "sr_mapDeviceMemoryWithIndex", obj=FourCC, index=uint, flags=uint, addr=OutPtr(ulong), length=OutPtr(ulong))
+        sr_mapDeviceMemoryWithIndex = Callback(
+            IOMFBStatus,
+            "sr_mapDeviceMemoryWithIndex",
+            obj=FourCC,
+            index=uint,
+            flags=uint,
+            addr=OutPtr(ulong),
+            length=OutPtr(ulong),
+        )
     else:
-        sr_mapDeviceMemoryWithIndex = Callback(IOMFBStatus, "sr_mapDeviceMemoryWithIndex", obj=FourCC, index=uint, flags=uint, unk_u64=OutPtr(ulong), addr=OutPtr(ulong), length=OutPtr(ulong))
+        sr_mapDeviceMemoryWithIndex = Callback(
+            IOMFBStatus,
+            "sr_mapDeviceMemoryWithIndex",
+            obj=FourCC,
+            index=uint,
+            flags=uint,
+            unk_u64=OutPtr(ulong),
+            addr=OutPtr(ulong),
+            length=OutPtr(ulong),
+        )
 
-    D400 = Callback(void, "get_property", obj=FourCC, key=string(0x40), value=OutPtr(Bytes(0x200)), length=InOutPtr(uint))
-    D401 = Callback(bool_, "sr_get_uint_prop", obj=FourCC, key=string(0x40), value=InOutPtr(ulong))
+    D400 = Callback(
+        void,
+        "get_property",
+        obj=FourCC,
+        key=string(0x40),
+        value=OutPtr(Bytes(0x200)),
+        length=InOutPtr(uint),
+    )
+    D401 = Callback(
+        bool_, "sr_get_uint_prop", obj=FourCC, key=string(0x40), value=InOutPtr(ulong)
+    )
     D404 = Callback(void, "sr_set_uint_prop", obj=FourCC, key=string(0x40), value=uint)
     D406 = Callback(void, "set_fx_prop", obj=FourCC, key=string(0x40), value=uint)
     D408 = Callback(uint64_t, "sr_getClockFrequency", obj=FourCC, arg=uint)
     D411 = sr_mapDeviceMemoryWithIndex
-    D413 = Callback(bool_, "sr_setProperty_dict", obj=FourCC, key=string(0x40), value=InPtr(Padded(0x1000, OSDictionary())))
-    D414 = Callback(bool_, "sr_setProperty_int", obj=FourCC, key=string(0x40), value=InPtr(uint64_t))
-    D415 = Callback(bool_, "sr_setProperty_bool", obj=FourCC, key=string(0x40), value=InPtr(Bool(uint32_t)))
+    D413 = Callback(
+        bool_,
+        "sr_setProperty_dict",
+        obj=FourCC,
+        key=string(0x40),
+        value=InPtr(Padded(0x1000, OSDictionary())),
+    )
+    D414 = Callback(
+        bool_, "sr_setProperty_int", obj=FourCC, key=string(0x40), value=InPtr(uint64_t)
+    )
+    D415 = Callback(
+        bool_,
+        "sr_setProperty_bool",
+        obj=FourCC,
+        key=string(0x40),
+        value=InPtr(Bool(uint32_t)),
+    )
+
 
 mem_desc_id = uint
 
+
 class MemDescRelay(IPCObject):
-    D451 = Callback(mem_desc_id, "allocate_buffer", uint, ulong, uint, OutPtr(ulong), OutPtr(ulong), OutPtr(ulong))
-    D452 = Callback(mem_desc_id, "map_physical", paddr=ulong, size=ulong, flags=uint, dva=OutPtr(ulong), dvasize=OutPtr(ulong))
-    D453 = Callback(mem_desc_id, "withAddressRange", ulong, ulong, uint, uint64_t, OutPtr(uint), OutPtr(ulong))
+    D451 = Callback(
+        mem_desc_id,
+        "allocate_buffer",
+        uint,
+        ulong,
+        uint,
+        OutPtr(ulong),
+        OutPtr(ulong),
+        OutPtr(ulong),
+    )
+    D452 = Callback(
+        mem_desc_id,
+        "map_physical",
+        paddr=ulong,
+        size=ulong,
+        flags=uint,
+        dva=OutPtr(ulong),
+        dvasize=OutPtr(ulong),
+    )
+    D453 = Callback(
+        mem_desc_id,
+        "withAddressRange",
+        ulong,
+        ulong,
+        uint,
+        uint64_t,
+        OutPtr(uint),
+        OutPtr(ulong),
+    )
     D454 = Callback(IOMFBStatus, "prepare", uint, uint)
     D455 = Callback(IOMFBStatus, "complete", uint, uint)
     D456 = Callback(bool_, "release_descriptor", uint)
+
 
 ALL_CLASSES = [
     UPPipeAP_H13P,
@@ -918,10 +1145,11 @@ SHORT_CHANNELS = {
     "OOBCB": "o",
 }
 
-RDIR = { ">": "<", "<": ">" }
+RDIR = {">": "<", "<": ">"}
+
 
 class Call:
-    def __init__(self, dir, chan, off, msg, in_size, out_size, in_data=b''):
+    def __init__(self, dir, chan, off, msg, in_size, out_size, in_data=b""):
         self.dir = dir
         self.chan = chan
         self.msg = msg
@@ -938,7 +1166,9 @@ class Call:
         self.complete = True
 
     def print_req(self, indent=""):
-        log = f"{indent}{self.dir}{SHORT_CHANNELS[self.chan]}[{self.off:#x}] {self.msg} "
+        log = (
+            f"{indent}{self.dir}{SHORT_CHANNELS[self.chan]}[{self.off:#x}] {self.msg} "
+        )
 
         cls, method = ALL_METHODS.get(self.msg, (None, None))
         if cls is None:
@@ -949,7 +1179,9 @@ class Call:
         in_size = method.in_struct.sizeof()
 
         if in_size != len(self.in_data):
-            print(f"{log} !! Expected {in_size:#x} bytes, got {len(self.in_data):#x} bytes (in)")
+            print(
+                f"{log} !! Expected {in_size:#x} bytes, got {len(self.in_data):#x} bytes (in)"
+            )
             dump_fields(method.in_fields)
             chexdump(self.in_data)
             self.in_vals = {}
@@ -962,8 +1194,8 @@ class Call:
         print(log)
 
         method.print_long_args(indent, self.in_vals)
-        #if method.in_fields:
-            #print(self.in_vals)
+        # if method.in_fields:
+        # print(self.in_vals)
 
     def print_reply(self, indent=""):
         assert self.complete
@@ -978,7 +1210,9 @@ class Call:
         out_size = method.out_struct.sizeof()
 
         if out_size != len(self.out_data):
-            print(f"{log} !! Expected {out_size:#x} bytes, got {len(self.out_data):#x} bytes (out)")
+            print(
+                f"{log} !! Expected {out_size:#x} bytes, got {len(self.out_data):#x} bytes (out)"
+            )
             dump_fields(method.out_fields)
             chexdump(self.out_data)
             return
@@ -995,8 +1229,8 @@ class Call:
         print(log)
 
         method.print_long_args(indent, self.in_vals, self.out_vals)
-        #if len(method.out_fields) - (self.ret is not None):
-            #print(self.out_vals)
+        # if len(method.out_fields) - (self.ret is not None):
+        # print(self.out_vals)
 
     def get_method(self):
         cls, method = ALL_METHODS.get(self.msg, (None, None))

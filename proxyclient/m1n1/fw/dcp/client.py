@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 from ...utils import *
-
+from ..afk.epic import *
 from ..asc import StandardASC
 from .dcpep import DCPEndpoint
-from ..afk.epic import *
+
 
 class DCPClient(StandardASC):
     ENDPOINTS = {

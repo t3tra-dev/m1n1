@@ -1,23 +1,38 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
 import time
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 import argparse
-from m1n1.hw.dart import DART
+
 from m1n1.hw.admac import *
+from m1n1.hw.dart import DART
 
 argparser = argparse.ArgumentParser()
-argparser.add_argument("-b", "--bufsize", type=int, default=1024*32,
-                       help="size of one DMA buffer (covered by one descriptor)")
-argparser.add_argument("-n", "--node", type=str, default="admac-sio",
-                       help="name of ADT node")
-argparser.add_argument("-c", "--chan", "--channel", type=int, default=0,
-                       help="channel no")
-argparser.add_argument("-w", "--buswidth", type=E_BUSWIDTH, default=E_BUSWIDTH.W_32BIT,
-                       help="DMA device-facing bus width")
-argparser.add_argument("-v", "--verbose", action='store_true')
+argparser.add_argument(
+    "-b",
+    "--bufsize",
+    type=int,
+    default=1024 * 32,
+    help="size of one DMA buffer (covered by one descriptor)",
+)
+argparser.add_argument(
+    "-n", "--node", type=str, default="admac-sio", help="name of ADT node"
+)
+argparser.add_argument(
+    "-c", "--chan", "--channel", type=int, default=0, help="channel no"
+)
+argparser.add_argument(
+    "-w",
+    "--buswidth",
+    type=E_BUSWIDTH,
+    default=E_BUSWIDTH.W_32BIT,
+    help="DMA device-facing bus width",
+)
+argparser.add_argument("-v", "--verbose", action="store_true")
 args = argparser.parse_args()
 
 from m1n1.setup import p, u
@@ -53,8 +68,9 @@ if "clock-gates" in u.adt[dart_path]._properties:
     p.pmgr_adt_clocks_enable(path)
 
 dart = DART.from_adt(u, dart_path)
-admac = ADMAC(u, admac_node.get_reg(0)[0], dart,
-              dart_stream=dart_idx, debug=args.verbose)
+admac = ADMAC(
+    u, admac_node.get_reg(0)[0], dart, dart_stream=dart_idx, debug=args.verbose
+)
 
 chan = admac.chans[args.chan]
 chan.disable()
@@ -72,7 +88,7 @@ chan.enable()
 
 try:
     if chan.tx:
-        while (buf := sys.stdin.buffer.read(args.bufsize)):
+        while buf := sys.stdin.buffer.read(args.bufsize):
             while not chan.can_submit():
                 chan.poll()
             chan.submit(buf)

@@ -2,61 +2,63 @@
 from construct import *
 
 from ...utils import *
-from ..asc import StandardASC
 from ..afk.epic import *
+from ..asc import StandardASC
 from .dcpav import *
 
-EOTF = "EOTF" / Enum(Int32ul,
-    GAMMA_SDR = 1,
-    GAMMA_HDR = 2,
+EOTF = "EOTF" / Enum(
+    Int32ul,
+    GAMMA_SDR=1,
+    GAMMA_HDR=2,
 )
 
-Encoding = "Encoding" / Enum(Int32ul,
-    RGB = 1,
-    YCBCR_444 = 3,
-    YCBCR_422 = 4,
-    YCBCR_420 = 5,
+Encoding = "Encoding" / Enum(
+    Int32ul,
+    RGB=1,
+    YCBCR_444=3,
+    YCBCR_422=4,
+    YCBCR_420=5,
 )
 
-Colorimetry = "Colorimetry" / Enum(Int32ul,
-    BT601_709 = 1,
-    BT2020 = 2,
-    DCIP3 = 3,
+Colorimetry = "Colorimetry" / Enum(
+    Int32ul,
+    BT601_709=1,
+    BT2020=2,
+    DCIP3=3,
 )
 
-Colorspace = "Colorspace" / Enum(Int32ul,
-    SRGB = 1,
-    Native = 2,
-    BT2020 = 3,
+Colorspace = "Colorspace" / Enum(
+    Int32ul,
+    SRGB=1,
+    Native=2,
+    BT2020=3,
 )
 
-SurfaceFormat = "SurfaceFormat" / Enum(Int32ul,
-    BGRA = 1,
-    BGRA2 = 2,
-    RGBA = 3,
-    w18p = 4,
-    BGRA3 = 5,
-    _444v = 6,
-    _422v = 7,
-    _420v = 8,
-    w30r = 9,
-    w40a = 10,
+SurfaceFormat = "SurfaceFormat" / Enum(
+    Int32ul,
+    BGRA=1,
+    BGRA2=2,
+    RGBA=3,
+    w18p=4,
+    BGRA3=5,
+    _444v=6,
+    _422v=7,
+    _420v=8,
+    w30r=9,
+    w40a=10,
 )
 
-Transform = "Transform" / Enum(Int8ul,
-    NONE = 0,
-    XFLIP = 1,
-    YFLIP = 2,
-    ROT_90 = 3,
-    ROT_180 = 4,
-    ROT_270 = 5,
+Transform = "Transform" / Enum(
+    Int8ul,
+    NONE=0,
+    XFLIP=1,
+    YFLIP=2,
+    ROT_90=3,
+    ROT_180=4,
+    ROT_270=5,
 )
 
-AddrFormat = "AddrFormat" / Enum(Int32ul,
-    PLANAR = 1,
-    TILED = 2,
-    AGX = 3
-)
+AddrFormat = "AddrFormat" / Enum(Int32ul, PLANAR=1, TILED=2, AGX=3)
 
 TimingMode = Struct(
     "valid" / Bool(Int32ul),
@@ -117,7 +119,7 @@ IBootLayerInfo = Struct(
     "colorspace" / Colorspace,
     "eotf" / EOTF,
     "transform" / Transform,
-    Padding(3)
+    Padding(3),
 )
 
 SwapSetLayer = Struct(
@@ -135,15 +137,16 @@ SwapSetLayer = Struct(
     "unk2" / Default(Int32ul, 0),
 )
 
+
 class DCPIBootService(EPICService):
     NAME = "disp0-service"
     SHORT = "disp0"
 
-    def send_cmd(self, op, data=b'', replen=None):
+    def send_cmd(self, op, data=b"", replen=None):
         msg = struct.pack("<IIII", op, 16 + len(data), 0, 0) + data
         if replen is not None:
             replen += 8
-        resp = super().send_cmd(0xc0, msg, replen)
+        resp = super().send_cmd(0xC0, msg, replen)
         if not resp:
             return
         rcmd, rlen = struct.unpack("<II", resp[:8])
@@ -185,26 +188,27 @@ class DCPIBootService(EPICService):
     def swapEnd(self):
         return self.send_cmd(18, b"\x00" * 12, replen=128)
 
-    #def swapWait(self, swap_id):
-        #buf = struct.pack("<IIII", 1, swap_id, 0, swap_id)
-        #return self.send_cmd(19, buf, replen=128)
+    # def swapWait(self, swap_id):
+    # buf = struct.pack("<IIII", 1, swap_id, 0, swap_id)
+    # return self.send_cmd(19, buf, replen=128)
+
 
 class DCPIBootEndpoint(EPICEndpoint):
     SHORT = "iboot"
-    
+
     SERVICES = [
         DCPIBootService,
     ]
 
 
 class DCPIBootClient(StandardASC):
-    DVA_OFFSET = 0xf00000000
+    DVA_OFFSET = 0xF00000000
 
     ENDPOINTS = {
         0x20: AFKSystemEndpoint,
         0x23: DCPIBootEndpoint,
         0x24: DCPDPTXEndpoint,
-        0x2a: DCPDPTXPortEndpoint,
+        0x2A: DCPDPTXPortEndpoint,
         0x27: DCPAVDeviceEndpoint,
         0x28: DCPAVServiceEndpoint,
         0x29: DCPAVVideoEndpoint,

@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
-from m1n1.setup import *
 from m1n1.find_regs import *
+from m1n1.setup import *
+
 from m1n1 import asm
 
 p.iodev_set_usage(IODEV.FB, 0)
@@ -34,7 +37,7 @@ for reg in [SPRR_CONFIG_EL1, GXF_CONFIG_EL1, SPRR_CONFIG_EL12, GXF_CONFIG_EL12]:
     for r in sorted(diff_regs):
         print("  %s --> %lx" % (sysreg_name(r), u.mrs(r)))
 
-gl2_items = list(find_regs(u, regs=static_regs,call="gl2"))
+gl2_items = list(find_regs(u, regs=static_regs, call="gl2"))
 gl2_vals = dict(gl2_items)
 gl2_regs = set(k for k, v in gl2_items)
 
@@ -68,8 +71,8 @@ for reg in sorted(gl1_regs - all_regs):
         print(">RO")
         continue
 
-    gl2_vals = dict(find_regs(u, regs=static_regs,call="gl2"))
-    u.msr(reg, cval ^ 0xffff, call="gl1", silent=True)
+    gl2_vals = dict(find_regs(u, regs=static_regs, call="gl2"))
+    u.msr(reg, cval ^ 0xFFFF, call="gl1", silent=True)
 
     for r, v in find_regs(u, regs=static_regs, call="gl2"):
         if v != gl2_vals[r]:

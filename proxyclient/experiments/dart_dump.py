@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 import struct
 
-from m1n1.setup import *
-from m1n1 import asm
 from m1n1.hw.dart import DART
+from m1n1.setup import *
+
+from m1n1 import asm
 
 if len(sys.argv) > 1:
     dart_name = sys.argv[1]

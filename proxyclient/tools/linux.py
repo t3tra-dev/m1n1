@@ -1,32 +1,40 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
+
 import serial
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
-import argparse, pathlib
+import argparse
+import pathlib
 
-parser = argparse.ArgumentParser(description='(Linux) kernel loader for m1n1')
-parser.add_argument('payload', type=pathlib.Path)
-parser.add_argument('dtb', type=pathlib.Path)
-parser.add_argument('initramfs', nargs='?', type=pathlib.Path)
-parser.add_argument('--compression', choices=['auto', 'none', 'gz', 'xz'], default='auto')
-parser.add_argument('-b', '--bootargs', type=str, metavar='"boot arguments"')
-parser.add_argument('-t', '--tty', type=str)
-parser.add_argument('-u', '--u-boot', type=pathlib.Path, help="load u-boot before linux")
-parser.add_argument('-T', '--tso', action="store_true", help="enable TSO")
+parser = argparse.ArgumentParser(description="(Linux) kernel loader for m1n1")
+parser.add_argument("payload", type=pathlib.Path)
+parser.add_argument("dtb", type=pathlib.Path)
+parser.add_argument("initramfs", nargs="?", type=pathlib.Path)
+parser.add_argument(
+    "--compression", choices=["auto", "none", "gz", "xz"], default="auto"
+)
+parser.add_argument("-b", "--bootargs", type=str, metavar='"boot arguments"')
+parser.add_argument("-t", "--tty", type=str)
+parser.add_argument(
+    "-u", "--u-boot", type=pathlib.Path, help="load u-boot before linux"
+)
+parser.add_argument("-T", "--tso", action="store_true", help="enable TSO")
 args = parser.parse_args()
 
 from m1n1.setup import *
 
-if args.compression == 'auto':
+if args.compression == "auto":
     suffix = args.payload.suffix
-    if suffix == '.gz':
-        args.compression = 'gz'
-    elif suffix == '.xz':
-        args.compression = 'xz'
+    if suffix == ".gz":
+        args.compression = "gz"
+    elif suffix == ".xz":
+        args.compression = "xz"
     else:
-        raise ValueError('unknown compression for {}'.format(args.payload))
+        raise ValueError("unknown compression for {}".format(args.payload))
 
 if args.tty is not None:
     tty_dev = serial.Serial(args.tty)
@@ -48,11 +56,14 @@ if args.bootargs is not None:
     print('Setting boot args: "{}"'.format(args.bootargs))
     p.kboot_set_chosen("bootargs", args.bootargs)
 
-if args.compression != 'none':
+if args.compression != "none":
     compressed_size = len(payload)
     compressed_addr = u.malloc(compressed_size)
 
-    print("Loading %d bytes to 0x%x..0x%x..." % (compressed_size, compressed_addr, compressed_addr + compressed_size))
+    print(
+        "Loading %d bytes to 0x%x..0x%x..."
+        % (compressed_size, compressed_addr, compressed_addr + compressed_size)
+    )
     iface.writemem(compressed_addr, payload, True)
 
 dtb_addr = u.malloc(len(dtb))
@@ -66,7 +77,7 @@ boot_addr = kernel_base
 
 print("Kernel_base: 0x%x" % kernel_base)
 
-assert not (kernel_base & 0xffff)
+assert not (kernel_base & 0xFFFF)
 
 if initramfs is not None:
     initramfs_base = u.memalign(65536, initramfs_size)
@@ -78,17 +89,30 @@ if initramfs is not None:
 if args.u_boot:
     uboot = bytearray(args.u_boot.read_bytes())
     uboot_size = len(uboot)
-    uboot_addr = u.memalign(2*1024*1024, len(uboot))
+    uboot_addr = u.memalign(2 * 1024 * 1024, len(uboot))
     print("Loading u-boot to 0x%x..." % uboot_addr)
 
     bootenv_start = uboot.find(b"bootcmd=run distro_bootcmd")
     bootenv_len = uboot[bootenv_start:].find(b"\x00\x00")
-    bootenv_old = uboot[bootenv_start:bootenv_start+bootenv_len]
+    bootenv_old = uboot[bootenv_start : bootenv_start + bootenv_len]
     bootenv = str(bootenv_old, "ascii").split("\x00")
-    bootenv = list(filter(lambda x: not (x.startswith("baudrate") or x.startswith("boot_") or x.startswith("distro_bootcmd")), bootenv))
+    bootenv = list(
+        filter(
+            lambda x: not (
+                x.startswith("baudrate")
+                or x.startswith("boot_")
+                or x.startswith("distro_bootcmd")
+            ),
+            bootenv,
+        )
+    )
 
     if initramfs is not None:
-        bootcmd = "distro_bootcmd=booti 0x%x 0x%x:0x%x $fdtcontroladdr" % (kernel_base, initramfs_base, initramfs_size)
+        bootcmd = "distro_bootcmd=booti 0x%x 0x%x:0x%x $fdtcontroladdr" % (
+            kernel_base,
+            initramfs_base,
+            initramfs_size,
+        )
     else:
         bootcmd = "distro_bootcmd=booti 0x%x - $fdtcontroladdr" % (kernel_base)
 
@@ -103,7 +127,7 @@ if args.u_boot:
 
     if len(bootenv_new) > len(bootenv_old):
         raise Exception("New bootenv cannot be larger than original bootenv")
-    uboot[bootenv_start:bootenv_start+bootenv_len] = bootenv_new
+    uboot[bootenv_start : bootenv_start + bootenv_len] = bootenv_new
 
     u.compressed_writemem(uboot_addr, uboot, True)
     p.dc_cvau(uboot_addr, uboot_size)
@@ -117,13 +141,19 @@ p.smp_start_secondaries()
 if args.tso:
     print("Enabling TSO:")
     actlr = u.mrs("ACTLR_EL1")
-    actlr |= (1 << 1) # TSO
+    actlr |= 1 << 1  # TSO
     print("  CPU #0")
     u.msr("ACTLR_EL1", actlr)
     for i in range(1, 64):
         if p.smp_is_alive(i):
             print(f"  CPU #{i}")
-            u.msr("ACTLR_EL1", actlr, call=lambda addr, *args: p.smp_call_sync(i, addr & ~REGION_RX_EL1, *args))
+            u.msr(
+                "ACTLR_EL1",
+                actlr,
+                call=lambda addr, *args: p.smp_call_sync(
+                    i, addr & ~REGION_RX_EL1, *args
+                ),
+            )
     p.kboot_set_chosen("apple,tso", "")
 
 if p.kboot_prepare_dt(dtb_addr):
@@ -132,18 +162,21 @@ if p.kboot_prepare_dt(dtb_addr):
 
 iface.dev.timeout = 40
 
-if args.compression == 'none':
+if args.compression == "none":
     kernel_size = len(payload)
-    print("Loading %d bytes to 0x%x..0x%x..." % (kernel_size, kernel_base, kernel_base + kernel_size))
+    print(
+        "Loading %d bytes to 0x%x..0x%x..."
+        % (kernel_size, kernel_base, kernel_base + kernel_size)
+    )
     iface.writemem(kernel_base, payload, True)
-elif args.compression == 'gz':
+elif args.compression == "gz":
     print("Uncompressing gz ...")
     kernel_size = p.gzdec(compressed_addr, compressed_size, kernel_base, kernel_size)
-elif args.compression == 'xz':
+elif args.compression == "xz":
     print("Uncompressing xz ...")
     kernel_size = p.xzdec(compressed_addr, compressed_size, kernel_base, kernel_size)
 else:
-    raise ValueError('unsupported compression {}'.format(args.compression))
+    raise ValueError("unsupported compression {}".format(args.compression))
 
 print(kernel_size)
 
@@ -158,7 +191,7 @@ p.ic_ivau(kernel_base, kernel_size)
 print("Ready to boot")
 
 daif = u.mrs(DAIF)
-daif = 0xc0
+daif = 0xC0
 u.msr(DAIF, daif)
 print("DAIF: %x" % daif)
 

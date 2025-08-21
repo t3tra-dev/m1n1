@@ -1,36 +1,43 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 import argparse
 
-parser = argparse.ArgumentParser(description='Enter a shell for codec-poking')
-parser.add_argument('-n', '--no-reset', action="store_true")
+parser = argparse.ArgumentParser(description="Enter a shell for codec-poking")
+parser.add_argument("-n", "--no-reset", action="store_true")
 args = parser.parse_args()
 
+from m1n1.hw.codecs import *
+from m1n1.hw.i2c import I2C, I2CRegMapDev
 from m1n1.setup import *
 from m1n1.shell import run_shell
-from m1n1.hw.i2c import I2C, I2CRegMapDev
-from m1n1.hw.codecs import *
 
 i2c = {}
 
+
 class TAS5770(I2CRegMapDev):
-    REGMAP     = TAS5770Regs
+    REGMAP = TAS5770Regs
     ADDRESSING = (1, 1)
+
 
 class SN012776(I2CRegMapDev):
-    REGMAP     = SN012776Regs
+    REGMAP = SN012776Regs
     ADDRESSING = (1, 1)
 
+
 class CS42L84(I2CRegMapDev):
-    REGMAP     = CS42L84Regs
+    REGMAP = CS42L84Regs
     ADDRESSING = (0, 2)
 
+
 class SSM3515(I2CRegMapDev):
-    REGMAP     = SSM3515Regs
+    REGMAP = SSM3515Regs
     ADDRESSING = (0, 1)
+
 
 gpios = {}
 for node in u.adt["/arm-io"]:
@@ -78,8 +85,7 @@ for node in u.adt["/arm-io"]:
             print(f"Pulling #RST of {devnode.name}")
             p.mask32(addr, 1, 1)
 
-        if "interrupts" in devnode._properties \
-                and devnode.interrupt_parent in gpios:
+        if "interrupts" in devnode._properties and devnode.interrupt_parent in gpios:
             gpio_host = gpios[devnode.interrupt_parent]
             addr = gpio_host.get_reg(0)[0] + devnode.interrupts[0] * 4
             print(f"Monitoring IRQ of {devnode.name}")

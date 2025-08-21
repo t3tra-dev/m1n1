@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: MIT
-import itertools, fnmatch, sys
-from construct import *
+import fnmatch
+import itertools
 import sys
+
+from construct import *
 
 from .utils import AddrLookup, FourCC, SafeGreedyRange
 
@@ -10,14 +12,14 @@ __all__ = ["load_adt"]
 ADTPropertyStruct = Struct(
     "name" / PaddedString(32, "ascii"),
     "size" / Int32ul,
-    "value" / Bytes(this.size & 0x7fffffff)
+    "value" / Bytes(this.size & 0x7FFFFFFF),
 )
 
 ADTNodeStruct = Struct(
     "property_count" / Int32ul,
     "child_count" / Int32ul,
     "properties" / Array(this.property_count, Aligned(4, ADTPropertyStruct)),
-    "children" / Array(this.child_count, LazyBound(lambda: ADTNodeStruct))
+    "children" / Array(this.child_count, LazyBound(lambda: ADTNodeStruct)),
 )
 
 ADTStringList = SafeGreedyRange(CString("ascii"))
@@ -43,32 +45,40 @@ STD_PROPERTIES = {
     "power-gates": SafeGreedyRange(Int32ul),
 }
 
-PMAPIORanges = SafeGreedyRange(Struct(
-    "addr" / Hex(Int64ul),
-    "size" / Hex(Int64ul),
-    "flags" / Hex(Int32ul),
-    "name" / FourCC,
-))
+PMAPIORanges = SafeGreedyRange(
+    Struct(
+        "addr" / Hex(Int64ul),
+        "size" / Hex(Int64ul),
+        "flags" / Hex(Int32ul),
+        "name" / FourCC,
+    )
+)
 
-PMGRPSRegs = SafeGreedyRange(Struct(
-    "reg" / Int32ul,
-    "offset" / Hex(Int32ul),
-    "mask" / Hex(Int32ul),
-))
+PMGRPSRegs = SafeGreedyRange(
+    Struct(
+        "reg" / Int32ul,
+        "offset" / Hex(Int32ul),
+        "mask" / Hex(Int32ul),
+    )
+)
 
-PMGRPerfRegs = SafeGreedyRange(Struct(
-    "reg" / Int32ul,
-    "offset" / Hex(Int32ul),
-    "size" / Hex(Int32ul),
-    "unk" / Int32ul,
-))
+PMGRPerfRegs = SafeGreedyRange(
+    Struct(
+        "reg" / Int32ul,
+        "offset" / Hex(Int32ul),
+        "size" / Hex(Int32ul),
+        "unk" / Int32ul,
+    )
+)
 
-PMGRPWRGateRegs = SafeGreedyRange(Struct(
-    "reg" / Int32ul,
-    "offset" / Hex(Int32ul),
-    "mask" / Hex(Int32ul),
-    "unk" / Hex(Int32ul),
-))
+PMGRPWRGateRegs = SafeGreedyRange(
+    Struct(
+        "reg" / Int32ul,
+        "offset" / Hex(Int32ul),
+        "mask" / Hex(Int32ul),
+        "unk" / Hex(Int32ul),
+    )
+)
 
 PMGRDeviceFlags = BitStruct(
     "b7" / Flag,
@@ -81,69 +91,83 @@ PMGRDeviceFlags = BitStruct(
     "on" / Flag,
 )
 
-PMGRDevices = SafeGreedyRange(Struct(
-    "flags" / PMGRDeviceFlags,
-    "unk1_0" / Int8ul,
-    "unk1_1" / Int8ul,
-    "id1" / Int8ul,
-    "parents_un" / Union (0,
-        "u8id" / Struct(
-            "parents" / Array(2, Int8ul),
-            "unk_u8id" / Array(2, Int8ul),
+PMGRDevices = SafeGreedyRange(
+    Struct(
+        "flags" / PMGRDeviceFlags,
+        "unk1_0" / Int8ul,
+        "unk1_1" / Int8ul,
+        "id1" / Int8ul,
+        "parents_un"
+        / Union(
+            0,
+            "u8id"
+            / Struct(
+                "parents" / Array(2, Int8ul),
+                "unk_u8id" / Array(2, Int8ul),
+            ),
+            "u16id"
+            / Struct(
+                "parents" / Array(2, Int16ul),
+            ),
         ),
-        "u16id" / Struct (
-            "parents" / Array(2, Int16ul),
-        ),
-    ),
-    "perf_idx" / Int8ul,
-    "perf_block" / Int8ul,
-    "psidx" / Int8ul,
-    "psreg" / Int8ul,
-    "unk2_0" / Int16ul,
-    "pd" / Int8ul,
-    "ps_cfg16" / Int8ul,
-    "unk2_1" / Int32ul,
-    "unk2_2" / Int32ul,
-    "unk2_3" / Int16ul,
-    "id2" / Int16ul,
-    "unk3" / Int32ul,
-    "name" / PaddedString(16, "ascii")
-))
+        "perf_idx" / Int8ul,
+        "perf_block" / Int8ul,
+        "psidx" / Int8ul,
+        "psreg" / Int8ul,
+        "unk2_0" / Int16ul,
+        "pd" / Int8ul,
+        "ps_cfg16" / Int8ul,
+        "unk2_1" / Int32ul,
+        "unk2_2" / Int32ul,
+        "unk2_3" / Int16ul,
+        "id2" / Int16ul,
+        "unk3" / Int32ul,
+        "name" / PaddedString(16, "ascii"),
+    )
+)
 
-PMGRClocks = SafeGreedyRange(Struct(
-    "perf_idx" / Int8ul,
-    "perf_block" / Int8ul,
-    "unk" / Int8ul,
-    "id" / Int8ul,
-    Const(0, Int32ul),
-    "name" / PaddedString(16, "ascii"),
-))
+PMGRClocks = SafeGreedyRange(
+    Struct(
+        "perf_idx" / Int8ul,
+        "perf_block" / Int8ul,
+        "unk" / Int8ul,
+        "id" / Int8ul,
+        Const(0, Int32ul),
+        "name" / PaddedString(16, "ascii"),
+    )
+)
 
-PMGRPowerDomains = SafeGreedyRange(Struct(
-    "unk" / Int8ul,
-    "perf_idx" / Int8ul,
-    "perf_block" / Int8ul,
-    "id" / Int8ul,
-    "flags" / Int32ul,
-    "name" / PaddedString(16, "ascii"),
-))
+PMGRPowerDomains = SafeGreedyRange(
+    Struct(
+        "unk" / Int8ul,
+        "perf_idx" / Int8ul,
+        "perf_block" / Int8ul,
+        "id" / Int8ul,
+        "flags" / Int32ul,
+        "name" / PaddedString(16, "ascii"),
+    )
+)
 
-PMGRDeviceBridges = SafeGreedyRange(Struct(
-    "idx" / Int32ub,
-    "subdevs" / HexDump(Bytes(0x48)),
-))
+PMGRDeviceBridges = SafeGreedyRange(
+    Struct(
+        "idx" / Int32ub,
+        "subdevs" / HexDump(Bytes(0x48)),
+    )
+)
 
-PMGREvents = SafeGreedyRange(Struct(
-    "unk1" / Int8ul,
-    "unk2" / Int8ul,
-    "unk3" / Int8ul,
-    "id" / Int8ul,
-    "perf2_idx" / Int8ul,
-    "perf2_block" / Int8ul,
-    "perf_idx" / Int8ul,
-    "perf_block" / Int8ul,
-    "name" / PaddedString(16, "ascii"),
-))
+PMGREvents = SafeGreedyRange(
+    Struct(
+        "unk1" / Int8ul,
+        "unk2" / Int8ul,
+        "unk3" / Int8ul,
+        "id" / Int8ul,
+        "perf2_idx" / Int8ul,
+        "perf2_block" / Int8ul,
+        "perf_idx" / Int8ul,
+        "perf_block" / Int8ul,
+        "name" / PaddedString(16, "ascii"),
+    )
+)
 
 GPUPerfState = Struct(
     "freq" / Int32ul,
@@ -175,27 +199,34 @@ DCBlockerConfig = Struct(
     "pad" / Hex(Int16ul),
 )
 
-Coef = ExprAdapter(Int32ul,
-                   lambda x, ctx: (x - ((x & 0x1000000) << 1)) / 65536,
-                   lambda x, ctx: int(round(x * 65536)) & 0x1ffffff)
+Coef = ExprAdapter(
+    Int32ul,
+    lambda x, ctx: (x - ((x & 0x1000000) << 1)) / 65536,
+    lambda x, ctx: int(round(x * 65536)) & 0x1FFFFFF,
+)
 
-MTRPolynomFuseAGX = GreedyRange(Struct(
-    "id" / Int32ul,
-    "data" / Prefixed(Int32ul, GreedyRange(Coef)),
-))
+MTRPolynomFuseAGX = GreedyRange(
+    Struct(
+        "id" / Int32ul,
+        "data" / Prefixed(Int32ul, GreedyRange(Coef)),
+    )
+)
 
 SpeakerThieleSmall = Struct(
     "unk0" / Int16ul,
     "unk1" / Int16ul,
-    "speakers" / GreedyRange(Struct(
-        "pad0" / Hex(Int32ul),
-        "r_mohm" / Int16ul,
-        "temp" / Int16ul,
-        "pad1" / Hex(Int32ul),
-        "pad2" / Hex(Int32ul),
-        "pad3" / Hex(Int16ul),
-        "name" / FourCC,
-    )),
+    "speakers"
+    / GreedyRange(
+        Struct(
+            "pad0" / Hex(Int32ul),
+            "r_mohm" / Int16ul,
+            "temp" / Int16ul,
+            "pad1" / Hex(Int32ul),
+            "pad2" / Hex(Int32ul),
+            "pad3" / Hex(Int16ul),
+            "name" / FourCC,
+        )
+    ),
     "checksum" / Hex(Int16ul),
 )
 
@@ -362,6 +393,7 @@ DEV_PROPERTIES = {
     },
 }
 
+
 def parse_prop(node, path, node_name, name, v, is_template=False):
     t = None
 
@@ -406,7 +438,7 @@ def parse_prop(node, path, node_name, name, v, is_template=False):
                     continue
                 break
 
-    if v == b'' or v is None:
+    if v == b"" or v is None:
         return None, None
 
     if name.startswith("function-"):
@@ -463,7 +495,7 @@ def parse_prop(node, path, node_name, name, v, is_template=False):
 
     if name in STD_PROPERTIES:
         t = STD_PROPERTIES[name]
-    elif v and v[-1] == 0 and all(0x20 <= i <= 0x7e for i in v[:-1]):
+    elif v and v[-1] == 0 and all(0x20 <= i <= 0x7E for i in v[:-1]):
         t = CString("ascii")
     elif len(v) == 4:
         t = Int32ul
@@ -481,9 +513,10 @@ def parse_prop(node, path, node_name, name, v, is_template=False):
 
     return t, v
 
+
 def build_prop(path, name, v, t=None):
     if v is None:
-        return b''
+        return b""
     if t is not None:
         return t.build(v)
 
@@ -495,7 +528,7 @@ def build_prop(path, name, v, t=None):
     elif isinstance(v, str):
         t = CString("ascii")
     elif isinstance(v, int):
-        if v > 0xffffffff:
+        if v > 0xFFFFFFFF:
             t = Int64ul
         else:
             t = Int32ul
@@ -505,6 +538,7 @@ def build_prop(path, name, v, t=None):
         t = Array(len(v), Int32ul)
 
     return t.build(v)
+
 
 class ADTNode:
     def __init__(self, val=None, path="/", parent=None):
@@ -533,13 +567,18 @@ class ADTNode:
                     self._types[p.name] = t, is_template
                     self._properties[p.name] = v
                 except Exception as e:
-                    print(f"Exception parsing {path}.{p.name} value {p.value.hex()}:", file=sys.stderr)
+                    print(
+                        f"Exception parsing {path}.{p.name} value {p.value.hex()}:",
+                        file=sys.stderr,
+                    )
                     raise
 
             # Second pass
             for k, (t, is_template) in self._types.items():
                 if t is None:
-                    t, v = parse_prop(self, path, _name, k, self._properties[k], is_template)
+                    t, v = parse_prop(
+                        self, path, _name, k, self._properties[k], is_template
+                    )
                     self._types[k] = t, is_template
                     self._properties[k] = v
                     assert build_prop(self._path, k, v, t=t) == raw[k]
@@ -679,21 +718,29 @@ class ADTNode:
                 args = []
                 for arg in v.args:
                     b = arg.to_bytes(4, "big")
-                    is_ascii = all(0x20 <= c <= 0x7e for c in b)
-                    args.append(f"{arg:#x}" if not is_ascii else f"'{b.decode('ascii')}'")
+                    is_ascii = all(0x20 <= c <= 0x7E for c in b)
+                    args.append(
+                        f"{arg:#x}" if not is_ascii else f"'{b.decode('ascii')}'"
+                    )
                 return f"{v.phandle}:{v.name}({', '.join(args)})"
             name.startswith("function-")
         else:
             return str(v)
 
     def __str__(self, t=""):
-        return "\n".join([
-            t + f"{self.name} {{",
-            *(t + f"    {k} = {self._fmt_prop(k, v)}" for k, v in self._properties.items() if k != "name"),
-            "",
-            *(i.__str__(t + "    ") for i in self._children),
-            t + "}"
-        ])
+        return "\n".join(
+            [
+                t + f"{self.name} {{",
+                *(
+                    t + f"    {k} = {self._fmt_prop(k, v)}"
+                    for k, v in self._properties.items()
+                    if k != "name"
+                ),
+                "",
+                *(i.__str__(t + "    ") for i in self._children),
+                t + "}",
+            ]
+        )
 
     def __repr__(self):
         return f"<ADTNode {self.name}>"
@@ -706,7 +753,7 @@ class ADTNode:
         ac, sc = self._parent.address_cells, self._parent.size_cells
         return Struct(
             "addr" / Hex(Int64ul) if ac == 2 else Array(ac, Hex(Int32ul)),
-            "size" / Hex(Int64ul) if sc == 2 else Array(sc, Hex(Int32ul))
+            "size" / Hex(Int64ul) if sc == 2 else Array(sc, Hex(Int32ul)),
         )
 
     def get_reg(self, idx):
@@ -753,20 +800,22 @@ class ADTNode:
 
     def tostruct(self):
         properties = []
-        for k,v in itertools.chain(self._properties.items()):
+        for k, v in itertools.chain(self._properties.items()):
             t, is_template = self._types.get(k, (None, False))
             value = build_prop(self._path, k, v, t=t)
-            properties.append({
-                "name": k,
-                "size": len(value) | (0x80000000 if is_template else 0),
-                "value": value
-            })
+            properties.append(
+                {
+                    "name": k,
+                    "size": len(value) | (0x80000000 if is_template else 0),
+                    "value": value,
+                }
+            )
 
         data = {
             "property_count": len(self._properties),
             "child_count": len(self._children),
             "properties": properties,
-            "children": [c.tostruct() for c in self._children]
+            "children": [c.tostruct() for c in self._children],
         }
         return data
 
@@ -781,7 +830,7 @@ class ADTNode:
     def build_addr_lookup(self):
         lookup = AddrLookup()
         for node in self.walk_tree():
-            reg = getattr(node, 'reg', None)
+            reg = getattr(node, "reg", None)
             if not isinstance(reg, list):
                 continue
 
@@ -810,7 +859,9 @@ class ADTNode:
         return node
 
     def pmgr_init(self):
-        self.pmgr_u8id = (self["/arm-io/pmgr"].devices[0].id1 != self["/arm-io/pmgr"].devices[1].id1)
+        self.pmgr_u8id = (
+            self["/arm-io/pmgr"].devices[0].id1 != self["/arm-io/pmgr"].devices[1].id1
+        )
 
     def pmgr_dev_get_id(self, dev):
         if self.pmgr_u8id:
@@ -820,23 +871,34 @@ class ADTNode:
 
     def pmgr_dev_get_parents(self, dev):
         if self.pmgr_u8id:
-            return dev.parents_un.u8id.parents 
+            return dev.parents_un.u8id.parents
         else:
-            return dev.parents_un.u16id.parents 
+            return dev.parents_un.u16id.parents
+
 
 def load_adt(data):
     node = ADTNode(ADTNodeStruct.parse(data))
     node.pmgr_init()
     return node
 
-if __name__ == "__main__":
-    import sys, argparse, pathlib
 
-    parser = argparse.ArgumentParser(description='ADT test for m1n1')
-    parser.add_argument('input', type=pathlib.Path)
-    parser.add_argument('output', nargs='?', type=pathlib.Path)
-    parser.add_argument('-r', '--retrieve', help='retrieve and store the adt from m1n1', action='store_true')
-    parser.add_argument('-a', '--dump-addr', help='dump address lookup table', action='store_true')
+if __name__ == "__main__":
+    import argparse
+    import pathlib
+    import sys
+
+    parser = argparse.ArgumentParser(description="ADT test for m1n1")
+    parser.add_argument("input", type=pathlib.Path)
+    parser.add_argument("output", nargs="?", type=pathlib.Path)
+    parser.add_argument(
+        "-r",
+        "--retrieve",
+        help="retrieve and store the adt from m1n1",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-a", "--dump-addr", help="dump address lookup table", action="store_true"
+    )
     args = parser.parse_args()
 
     if args.retrieve:
@@ -845,6 +907,7 @@ if __name__ == "__main__":
             sys.exit()
 
         from .setup import *
+
         adt_data = u.get_adt()
         args.input.write_bytes(adt_data)
     else:
@@ -855,8 +918,8 @@ if __name__ == "__main__":
     new_data = adt.build()
     if args.output is not None:
         args.output.write_bytes(new_data)
-    assert new_data == adt_data[:len(new_data)]
-    assert adt_data[len(new_data):] == bytes(len(adt_data) - len(new_data))
+    assert new_data == adt_data[: len(new_data)]
+    assert adt_data[len(new_data) :] == bytes(len(adt_data) - len(new_data))
 
     if args.dump_addr:
         print("Address lookup table:")

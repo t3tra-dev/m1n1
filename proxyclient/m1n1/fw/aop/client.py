@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 from ...utils import *
-
 from ..asc import StandardASC
 from .aopep import *
 from .base import AOPBase
+
 
 class AOPClient(StandardASC, AOPBase):
     ENDPOINTS = {
@@ -16,6 +16,7 @@ class AOPClient(StandardASC, AOPBase):
         0x27: AOPAudioEndpoint,
         0x28: AOPVoiceTriggerEndpoint,
     }
+
     def __init__(self, u, dev_path, dart=None):
         node = u.adt[dev_path]
         asc_base = node.get_reg(0)[0]

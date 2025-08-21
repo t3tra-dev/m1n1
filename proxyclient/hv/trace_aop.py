@@ -1,17 +1,18 @@
 # SPDX-License-Identifier: MIT
 
-from m1n1.trace import Tracer
-from m1n1.trace.dart import DARTTracer
-from m1n1.trace.asc import ASCTracer, EP, EPState, msg, msg_log, DIR, EPContainer
-from m1n1.utils import *
+import sys
+
 from m1n1.constructutils import *
-from m1n1.fw.afk.rbep import *
 from m1n1.fw.afk.epic import *
+from m1n1.fw.afk.rbep import *
 from m1n1.fw.aop import *
 from m1n1.fw.aop.base import AOPBase
 from m1n1.fw.aop.ipc import *
+from m1n1.trace import Tracer
+from m1n1.trace.asc import DIR, EP, ASCTracer, EPContainer, EPState, msg, msg_log
+from m1n1.trace.dart import DARTTracer
+from m1n1.utils import *
 
-import sys
 
 class AFKRingBufSniffer(AFKRingBuf):
     def __init__(self, ep, state, base, size):
@@ -30,6 +31,7 @@ class AFKRingBufSniffer(AFKRingBuf):
 
     def read_buf(self, off, size):
         return self.ep.dart.ioread(0, self.base + off, size)
+
 
 class AFKEp(EP):
     BASE_MESSAGE = AFKEPMessage
@@ -53,22 +55,24 @@ class AFKEp(EP):
             return
         if not self.txbuf and self.state.txbuf_info:
             off, size = self.state.txbuf_info
-            self.txbuf = AFKRingBufSniffer(self, self.state.txbuf,
-                                           self.state.shmem_iova + off, size)
+            self.txbuf = AFKRingBufSniffer(
+                self, self.state.txbuf, self.state.shmem_iova + off, size
+            )
         if not self.rxbuf and self.state.rxbuf_info:
             off, size = self.state.rxbuf_info
-            self.rxbuf = AFKRingBufSniffer(self, self.state.rxbuf,
-                                           self.state.shmem_iova + off, size)
+            self.rxbuf = AFKRingBufSniffer(
+                self, self.state.rxbuf, self.state.shmem_iova + off, size
+            )
 
-    Init =          msg_log(0x80, DIR.TX)
-    Init_Ack =      msg_log(0xa0, DIR.RX)
+    Init = msg_log(0x80, DIR.TX)
+    Init_Ack = msg_log(0xA0, DIR.RX)
 
-    GetBuf =        msg_log(0x89, DIR.RX)
+    GetBuf = msg_log(0x89, DIR.RX)
 
-    Shutdown =      msg_log(0xc0, DIR.TX)
-    Shutdown_Ack =  msg_log(0xc1, DIR.RX)
+    Shutdown = msg_log(0xC0, DIR.TX)
+    Shutdown_Ack = msg_log(0xC1, DIR.RX)
 
-    @msg(0xa1, DIR.TX, AFKEP_GetBuf_Ack)
+    @msg(0xA1, DIR.TX, AFKEP_GetBuf_Ack)
     def GetBuf_Ack(self, msg):
         self.state.shmem_iova = msg.DVA
         self.txbuf = None
@@ -78,12 +82,14 @@ class AFKEp(EP):
         self.state.txbuf_info = None
         self.state.rxbuf_info = None
 
-    @msg(0xa2, DIR.TX, AFKEP_Send)
+    @msg(0xA2, DIR.TX, AFKEP_Send)
     def Send(self, msg):
         for data in self.txbuf.read():
-            #if self.state.verbose >= 3:
+            # if self.state.verbose >= 3:
             if True:
-                self.log(f"===TX DATA=== epid={self.epid} rptr={self.txbuf.state.rptr:#x}")
+                self.log(
+                    f"===TX DATA=== epid={self.epid} rptr={self.txbuf.state.rptr:#x}"
+                )
                 chexdump(data)
                 self.log(f"===END DATA===")
                 self.log("Backtrace on TX data:")
@@ -91,14 +97,16 @@ class AFKEp(EP):
             self.handle_ipc(data, dir=">")
         return True
 
-    Hello =         msg_log(0xa3, DIR.TX)
+    Hello = msg_log(0xA3, DIR.TX)
 
     @msg(0x85, DIR.RX, AFKEPMessage)
     def Recv(self, msg):
         for data in self.rxbuf.read():
-            #if self.state.verbose >= 3:
+            # if self.state.verbose >= 3:
             if True:
-                self.log(f"===RX DATA=== epid={self.epid} rptr={self.rxbuf.state.rptr:#x}")
+                self.log(
+                    f"===RX DATA=== epid={self.epid} rptr={self.rxbuf.state.rptr:#x}"
+                )
                 chexdump(data)
                 self.log(f"===END DATA===")
             self.handle_ipc(data, dir="<")
@@ -107,23 +115,25 @@ class AFKEp(EP):
     def handle_ipc(self, data, dir=None):
         pass
 
-    @msg(0x8a, DIR.RX, AFKEP_InitRB)
+    @msg(0x8A, DIR.RX, AFKEP_InitRB)
     def InitTX(self, msg):
         off = msg.OFFSET * AFKRingBuf.BLOCK_STEP
         size = msg.SIZE * AFKRingBuf.BLOCK_STEP
         self.state.txbuf_info = (off, size)
         self.create_bufs()
 
-    @msg(0x8b, DIR.RX, AFKEP_InitRB)
+    @msg(0x8B, DIR.RX, AFKEP_InitRB)
     def InitRX(self, msg):
         off = msg.OFFSET * AFKRingBuf.BLOCK_STEP
         size = msg.SIZE * AFKRingBuf.BLOCK_STEP
         self.state.rxbuf_info = (off, size)
         self.create_bufs()
 
+
 class DummyAFKEp(AFKEp):
     def handle_ipc(self, data, dir=None):
         pass
+
 
 class EPICEp(AFKEp):
     def __init__(self, *args, **kwargs):
@@ -132,7 +142,7 @@ class EPICEp(AFKEp):
         self.pending_cmd = None
 
     def handle_hello(self, hdr, sub, fd):
-        if sub.type != 0xc0:
+        if sub.type != 0xC0:
             return False
 
         payload = fd.read()
@@ -175,11 +185,15 @@ class EPICEp(AFKEp):
         hdr = EPICHeader.parse_stream(fd)
         sub = EPICSubHeaderVer2.parse_stream(fd)
 
-        if not getattr(self, 'VERBOSE', False):
+        if not getattr(self, "VERBOSE", False):
             return
 
-        self.log(f"{dir} 0x{hdr.channel:x} Type {hdr.type} Ver {hdr.version} Tag {hdr.seq}")
-        self.log(f"  Len {sub.length} Ver {sub.version} Cat {sub.category} Type {sub.type:#x} Ts {sub.timestamp:#x}")
+        self.log(
+            f"{dir} 0x{hdr.channel:x} Type {hdr.type} Ver {hdr.version} Tag {hdr.seq}"
+        )
+        self.log(
+            f"  Len {sub.length} Ver {sub.version} Cat {sub.category} Type {sub.type:#x} Ts {sub.timestamp:#x}"
+        )
         self.log(f"  Unk1 {sub.unk1:#x} Unk2 {sub.unk2:#x}")
 
         if self.dispatch_ipc(dir, hdr, sub, fd):
@@ -196,27 +210,35 @@ class EPICEp(AFKEp):
             call = call.unwrap()
         call.dump(self.log)
 
+
 class SPUAppEp(EPICEp):
     SHORT = "SPUApp"
+
 
 class AccelEp(EPICEp):
     SHORT = "accel"
 
+
 class GyroEp(EPICEp):
     SHORT = "gyro"
+
 
 class LASEp(EPICEp):
     SHORT = "las"
 
+
 class WakeHintEp(EPICEp):
     SHORT = "wakehint"
+
 
 class UNK26Ep(EPICEp):
     SHORT = "unk26"
 
+
 class AudioEp(EPICEp):
     SHORT = "aop-audio"
     VERBOSE = True
+
 
 class VoiceTriggerEp(EPICEp):
     SHORT = "aop-voicetrigger"
@@ -264,6 +286,7 @@ class AOPTracer(ASCTracer, AOPBase):
 
             def log(self, str):
                 print(str)
+
         asc_tracer = FakeASCTracer()
 
         for cls in cls.mro():
@@ -283,9 +306,8 @@ class AOPTracer(ASCTracer, AOPBase):
         def readdump(firstline, hdr, f):
             l = firstline
             assert hdr in l
-            postscribe = l[l.index(hdr) + len(hdr):]
-            annotation = dict([s.split("=") for s \
-                              in postscribe.strip().split(" ")])
+            postscribe = l[l.index(hdr) + len(hdr) :]
+            annotation = dict([s.split("=") for s in postscribe.strip().split(" ")])
 
             dump = []
             for l in f:
@@ -302,6 +324,7 @@ class AOPTracer(ASCTracer, AOPBase):
             data, annot = readdump(l, hdr, f)
             assert int(annot["addr"], 16) == icall.args.txbuf
             icall.txbuf = data
+
         def read_rxbuf(icall, ep):
             hdr = "===COMMAND RX DATA==="
             for l in f:
@@ -310,6 +333,7 @@ class AOPTracer(ASCTracer, AOPBase):
             data, annot = readdump(l, hdr, f)
             assert int(annot["addr"], 16) == icall.rets.rxbuf
             icall.rxbuf = data
+
         IndirectCall.read_rxbuf = read_rxbuf
         IndirectCall.read_txbuf = read_txbuf
 
@@ -327,7 +351,7 @@ class AOPTracer(ASCTracer, AOPBase):
             data, annot = readdump(l, hdr, f)
             epid = int(annot["epid"])
             epmap[epid].handle_ipc(data, dir)
-                        
+
 
 if __name__ == "__main__":
     # We can replay traces by saving the textual output of live tracing
@@ -341,10 +365,10 @@ dart_aop_tracer.start()
 
 dart_aop_base = u.adt["/arm-io/dart-aop"].get_reg(0)[0]
 
-#hv.trace_range(irange(*u.adt["/arm-io/dart-aop"].get_reg(1)))
-#hv.trace_range(irange(*u.adt["/arm-io/aop"].get_reg(1)))
-#hv.trace_range(irange(*u.adt["/arm-io/aop"].get_reg(3)))
-#hv.trace_range(irange(*u.adt["/arm-io/admac-aop-audio"].get_reg(0)))
+# hv.trace_range(irange(*u.adt["/arm-io/dart-aop"].get_reg(1)))
+# hv.trace_range(irange(*u.adt["/arm-io/aop"].get_reg(1)))
+# hv.trace_range(irange(*u.adt["/arm-io/aop"].get_reg(3)))
+# hv.trace_range(irange(*u.adt["/arm-io/admac-aop-audio"].get_reg(0)))
 
 aop_tracer = AOPTracer(hv, "/arm-io/aop", verbose=1)
 aop_tracer.start(dart_aop_tracer.dart)

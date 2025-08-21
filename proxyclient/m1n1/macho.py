@@ -1,25 +1,28 @@
 # SPDX-License-Identifier: MIT
-from io import BytesIO, SEEK_END, SEEK_SET
 import bisect
-from construct import *
 import subprocess
+from io import SEEK_END, SEEK_SET, BytesIO
+
+from construct import *
 
 from .utils import *
 
 __all__ = ["MachO"]
 
-MachOLoadCmdType = "LoadCmdType" / Enum(Int32ul,
-    SYMTAB = 0x02,
-    UNIXTHREAD = 0x05,
-    SEGMENT_64 = 0x19,
-    UUID = 0x1b,
-    BUILD_VERSION = 0x32,
-    DYLD_CHAINED_FIXUPS = 0x80000034,
-    FILESET_ENTRY = 0x80000035,
+MachOLoadCmdType = "LoadCmdType" / Enum(
+    Int32ul,
+    SYMTAB=0x02,
+    UNIXTHREAD=0x05,
+    SEGMENT_64=0x19,
+    UUID=0x1B,
+    BUILD_VERSION=0x32,
+    DYLD_CHAINED_FIXUPS=0x80000034,
+    FILESET_ENTRY=0x80000035,
 )
 
-MachOArmThreadStateFlavor = "ThreadStateFlavor" / Enum(Int32ul,
-    THREAD64 = 6,
+MachOArmThreadStateFlavor = "ThreadStateFlavor" / Enum(
+    Int32ul,
+    THREAD64=6,
 )
 
 MachOHeader = Struct(
@@ -33,10 +36,11 @@ MachOHeader = Struct(
     "reserved" / Hex(Int32ul),
 )
 
-MachOVmProt = FlagsEnum(Int32sl,
-    PROT_READ = 0x01,
-    PROT_WRITE = 0x02,
-    PROT_EXECUTE = 0x04,
+MachOVmProt = FlagsEnum(
+    Int32sl,
+    PROT_READ=0x01,
+    PROT_WRITE=0x02,
+    PROT_EXECUTE=0x04,
 )
 
 MachOCmdSymTab = Struct(
@@ -46,20 +50,29 @@ MachOCmdSymTab = Struct(
     "strsize" / Hex(Int32ul),
 )
 
-MachOCmdUnixThread = GreedyRange(Struct(
-    "flavor" / MachOArmThreadStateFlavor,
-    "data" / Prefixed(ExprAdapter(Int32ul, obj_ * 4, obj_ / 4), Switch(this.flavor, {
-        MachOArmThreadStateFlavor.THREAD64: Struct(
-            "x" / Array(29, Hex(Int64ul)),
-            "fp" / Hex(Int64ul),
-            "lr" / Hex(Int64ul),
-            "sp" / Hex(Int64ul),
-            "pc" / Hex(Int64ul),
-            "cpsr" / Hex(Int32ul),
-            "flags" / Hex(Int32ul),
-        )
-    })),
-))
+MachOCmdUnixThread = GreedyRange(
+    Struct(
+        "flavor" / MachOArmThreadStateFlavor,
+        "data"
+        / Prefixed(
+            ExprAdapter(Int32ul, obj_ * 4, obj_ / 4),
+            Switch(
+                this.flavor,
+                {
+                    MachOArmThreadStateFlavor.THREAD64: Struct(
+                        "x" / Array(29, Hex(Int64ul)),
+                        "fp" / Hex(Int64ul),
+                        "lr" / Hex(Int64ul),
+                        "sp" / Hex(Int64ul),
+                        "pc" / Hex(Int64ul),
+                        "cpsr" / Hex(Int32ul),
+                        "flags" / Hex(Int32ul),
+                    )
+                },
+            ),
+        ),
+    )
+)
 
 NList = Struct(
     "n_strx" / Hex(Int32ul),
@@ -79,20 +92,23 @@ MachOCmdSegment64 = Struct(
     "initprot" / MachOVmProt,
     "nsects" / Int32ul,
     "flags" / Hex(Int32ul),
-    "sections" / GreedyRange(Struct(
-        "sectname" / PaddedString(16, "ascii"),
-        "segname" / PaddedString(16, "ascii"),
-        "addr" / Hex(Int64ul),
-        "size" / Hex(Int64ul),
-        "offset" / Hex(Int32ul),
-        "align" / Hex(Int32ul),
-        "reloff" / Hex(Int32ul),
-        "nreloc" / Hex(Int32ul),
-        "flags" / Hex(Int32ul),
-        "reserved1" / Hex(Int32ul),
-        "reserved2" / Hex(Int32ul),
-        "reserved3" / Hex(Int32ul),
-    )),
+    "sections"
+    / GreedyRange(
+        Struct(
+            "sectname" / PaddedString(16, "ascii"),
+            "segname" / PaddedString(16, "ascii"),
+            "addr" / Hex(Int64ul),
+            "size" / Hex(Int64ul),
+            "offset" / Hex(Int32ul),
+            "align" / Hex(Int32ul),
+            "reloff" / Hex(Int32ul),
+            "nreloc" / Hex(Int32ul),
+            "flags" / Hex(Int32ul),
+            "reserved1" / Hex(Int32ul),
+            "reserved2" / Hex(Int32ul),
+            "reserved3" / Hex(Int32ul),
+        )
+    ),
 )
 
 MachOFilesetEntry = Struct(
@@ -105,19 +121,28 @@ MachOFilesetEntry = Struct(
 
 MachOCmd = Struct(
     "cmd" / Hex(MachOLoadCmdType),
-    "args" / Prefixed(ExprAdapter(Int32ul, obj_ - 8, obj_ + 8), Switch(this.cmd, {
-        MachOLoadCmdType.SYMTAB: MachOCmdSymTab,
-        MachOLoadCmdType.UNIXTHREAD: MachOCmdUnixThread,
-        MachOLoadCmdType.SEGMENT_64: MachOCmdSegment64,
-        MachOLoadCmdType.UUID: Hex(Bytes(16)),
-        MachOLoadCmdType.FILESET_ENTRY: MachOFilesetEntry,
-    }, default=GreedyBytes)),
+    "args"
+    / Prefixed(
+        ExprAdapter(Int32ul, obj_ - 8, obj_ + 8),
+        Switch(
+            this.cmd,
+            {
+                MachOLoadCmdType.SYMTAB: MachOCmdSymTab,
+                MachOLoadCmdType.UNIXTHREAD: MachOCmdUnixThread,
+                MachOLoadCmdType.SEGMENT_64: MachOCmdSegment64,
+                MachOLoadCmdType.UUID: Hex(Bytes(16)),
+                MachOLoadCmdType.FILESET_ENTRY: MachOFilesetEntry,
+            },
+            default=GreedyBytes,
+        ),
+    ),
 )
 
 MachOFile = Struct(
     "header" / MachOHeader,
     "cmds" / Array(this.header.ncmds, MachOCmd),
 )
+
 
 class MachO:
     def __init__(self, data):
@@ -155,21 +180,29 @@ class MachO:
             dest = cmd.args.vmaddr - self.vmin
             end = min(self.size, cmd.args.fileoff + cmd.args.filesize)
             size = end - cmd.args.fileoff
-            print(f"LOAD: {cmd.args.segname} {size} bytes from {cmd.args.fileoff:x} to {dest:x}")
+            print(
+                f"LOAD: {cmd.args.segname} {size} bytes from {cmd.args.fileoff:x} to {dest:x}"
+            )
             self.io.seek(self.off + cmd.args.fileoff)
             data = self.io.read(size)
             if load_hook is not None:
                 data = load_hook(data, cmd.args.segname, size, cmd.args.fileoff, dest)
-            image[dest:dest + size] = data
+            image[dest : dest + size] = data
             if cmd.args.vmsize > size:
                 clearsize = cmd.args.vmsize - size
                 if cmd.args.segname == "PYLD":
-                    print("SKIP: %d bytes from 0x%x to 0x%x" % (clearsize, dest + size, dest + size + clearsize))
-                    memory_size -= clearsize - 4 # leave a payload end marker
+                    print(
+                        "SKIP: %d bytes from 0x%x to 0x%x"
+                        % (clearsize, dest + size, dest + size + clearsize)
+                    )
+                    memory_size -= clearsize - 4  # leave a payload end marker
                     image = image[:memory_size]
                 else:
-                    print("ZERO: %d bytes from 0x%x to 0x%x" % (clearsize, dest + size, dest + size + clearsize))
-                    image[dest + size:dest + cmd.args.vmsize] = bytes(clearsize)
+                    print(
+                        "ZERO: %d bytes from 0x%x to 0x%x"
+                        % (clearsize, dest + size, dest + size + clearsize)
+                    )
+                    image[dest + size : dest + cmd.args.vmsize] = bytes(clearsize)
 
         return image
 
@@ -183,7 +216,9 @@ class MachO:
         if len(cmds) == 0:
             raise Exception(f"No commands of type {cmdtype}")
         if len(cmds) > 1:
-            raise Exception(f"More than one commands of type {cmdtype} (found {len(cmd)})")
+            raise Exception(
+                f"More than one commands of type {cmdtype} (found {len(cmd)})"
+            )
         return cmds[0]
 
     def load_fileset(self):
@@ -217,7 +252,9 @@ class MachO:
             sym_seg = sym_segs[seg.args.segname]
 
             start = bisect.bisect_left(symtab, (sym_seg.args.vmaddr, ""))
-            end = bisect.bisect_left(symtab, (sym_seg.args.vmaddr + sym_seg.args.vmsize, ""))
+            end = bisect.bisect_left(
+                symtab, (sym_seg.args.vmaddr + sym_seg.args.vmsize, "")
+            )
 
             for addr, sym in symtab[start:end]:
                 sname = f"{filename}:{sym}"
@@ -247,7 +284,9 @@ class MachO:
             argv = ["c++filt"]
             argv += names
 
-            with subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE) as proc:
+            with subprocess.Popen(
+                argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE
+            ) as proc:
                 demangled, _ = proc.communicate()
 
             demangled = demangled.decode("ascii").split("\n")[:-1]
@@ -256,8 +295,10 @@ class MachO:
         else:
             self.symbols = symbols_dict
 
+
 if __name__ == "__main__":
     import sys
+
     macho = MachO(open(sys.argv[1], "rb").read())
 
     if len(sys.argv) > 2:

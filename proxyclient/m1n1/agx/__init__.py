@@ -1,23 +1,27 @@
 # SPDX-License-Identifier: MIT
-import bisect, time
+import bisect
+import time
 
-from .object import GPUObject, GPUAllocator
-from .initdata import build_initdata
+from ..constructutils import Ver
+from ..fw.agx import AGXASC
+from ..fw.agx.channels import ChannelInfo, ChannelInfoSet
+from ..hw.agx import *
+from ..hw.uat import UAT, MemoryAttr
+from ..malloc import Heap
+from ..proxy import IODEV
 from .channels import *
 from .event import GPUEventManager
-from ..constructutils import Ver
-from ..proxy import IODEV
-from ..malloc import Heap
-from ..hw.uat import UAT, MemoryAttr
-from ..hw.agx import *
-from ..fw.agx import AGXASC
-from ..fw.agx.channels import ChannelInfoSet, ChannelInfo
+from .initdata import build_initdata
+from .object import GPUAllocator, GPUObject
+
 
 class AGXChannels:
     pass
 
+
 class AGXQueue:
     pass
+
 
 class AGX:
     PAGE_SIZE = 0x4000
@@ -54,41 +58,92 @@ class AGX:
         self.uat = UAT(self.u.iface, self.u)
 
         # Allocator for RTKit/ASC objects
-        self.uat.allocator = Heap(self.kern_va_base + 0x80000000,
-                                  self.kern_va_base + 0x81000000,
-                                  self.PAGE_SIZE)
+        self.uat.allocator = Heap(
+            self.kern_va_base + 0x80000000,
+            self.kern_va_base + 0x81000000,
+            self.PAGE_SIZE,
+        )
 
         self.asc = AGXASC(self.u, self.asc_dev.get_reg(0)[0], self, self.uat)
         self.asc.verbose = 0
         self.asc.mgmt.verbose = 0
 
-        self.kobj = GPUAllocator(self, "kernel",
-                                 self.kern_va_base, 0x20000000,
-                                 AttrIndex=MemoryAttr.Shared, AP=1, guard_pages=16)
-        self.cmdbuf = GPUAllocator(self, "cmdbuf",
-                                   self.kern_va_base + 0x20000000, 0x20000000,
-                                   AttrIndex=MemoryAttr.Shared, AP=1, UXN=1, PXN=1, guard_pages=16)
-        self.kshared = GPUAllocator(self, "kshared",
-                                    self.kern_va_base + 0x40000000, 0x20000000,
-                                    AttrIndex=MemoryAttr.Shared, AP=1, guard_pages=16)
-        self.kshared2 = GPUAllocator(self, "kshared2",
-                                     self.kern_va_base + 0x60000000, 0x100000,
-                                     AttrIndex=MemoryAttr.Shared, AP=0, PXN=1, guard_pages=16)
-        self.kgpurw = GPUAllocator(self, "kernel GPU RW",
-                                 self.kern_va_base + 0x70000000, 0x1000000,
-                                 AttrIndex=MemoryAttr.Shared, AP=0, UXN=1, PXN=1)
-        self.ktimestamp = GPUAllocator(self, "ktimestamp",
-                                    self.kern_va_base + 0x71000000, 0x4000000,
-                                    AttrIndex=MemoryAttr.Shared, AP=1, guard_pages=1)
+        self.kobj = GPUAllocator(
+            self,
+            "kernel",
+            self.kern_va_base,
+            0x20000000,
+            AttrIndex=MemoryAttr.Shared,
+            AP=1,
+            guard_pages=16,
+        )
+        self.cmdbuf = GPUAllocator(
+            self,
+            "cmdbuf",
+            self.kern_va_base + 0x20000000,
+            0x20000000,
+            AttrIndex=MemoryAttr.Shared,
+            AP=1,
+            UXN=1,
+            PXN=1,
+            guard_pages=16,
+        )
+        self.kshared = GPUAllocator(
+            self,
+            "kshared",
+            self.kern_va_base + 0x40000000,
+            0x20000000,
+            AttrIndex=MemoryAttr.Shared,
+            AP=1,
+            guard_pages=16,
+        )
+        self.kshared2 = GPUAllocator(
+            self,
+            "kshared2",
+            self.kern_va_base + 0x60000000,
+            0x100000,
+            AttrIndex=MemoryAttr.Shared,
+            AP=0,
+            PXN=1,
+            guard_pages=16,
+        )
+        self.kgpurw = GPUAllocator(
+            self,
+            "kernel GPU RW",
+            self.kern_va_base + 0x70000000,
+            0x1000000,
+            AttrIndex=MemoryAttr.Shared,
+            AP=0,
+            UXN=1,
+            PXN=1,
+        )
+        self.ktimestamp = GPUAllocator(
+            self,
+            "ktimestamp",
+            self.kern_va_base + 0x71000000,
+            0x4000000,
+            AttrIndex=MemoryAttr.Shared,
+            AP=1,
+            guard_pages=1,
+        )
 
-        self.klow = GPUAllocator(self, "kernel_low",
-                                 0x1500000000, 0x100000,
-                                 AttrIndex=MemoryAttr.Shared, AP=0, UXN=1, PXN=1)
+        self.klow = GPUAllocator(
+            self,
+            "kernel_low",
+            0x1500000000,
+            0x100000,
+            AttrIndex=MemoryAttr.Shared,
+            AP=0,
+            UXN=1,
+            PXN=1,
+        )
         self.klow.align_to_end = False
 
-        self.io_allocator = Heap(self.kern_va_base + 0x68000000,
-                                 self.kern_va_base + 0x70000000,
-                                 block=self.PAGE_SIZE)
+        self.io_allocator = Heap(
+            self.kern_va_base + 0x68000000,
+            self.kern_va_base + 0x70000000,
+            block=self.PAGE_SIZE,
+        )
 
         self.mon = None
         self.event_mgr = GPUEventManager(self)
@@ -103,8 +158,8 @@ class AGX:
 
     def poke_sgx(self):
         self.sgx_base = self.sgx_dev.get_reg(0)[0]
-        self.p.read32(self.sgx_base + 0xd14000)
-        self.p.write32(self.sgx_base + 0xd14000, 0x70001)
+        self.p.read32(self.sgx_base + 0xD14000)
+        self.p.write32(self.sgx_base + 0xD14000, 0x70001)
 
     def find_object(self, addr, ctx=0):
         all_objects = list(self.all_objects.items())
@@ -142,13 +197,21 @@ class AGX:
         item_size = cls.item_size()
         ring_size = item_count * item_size
 
-        self.log(f"Allocating {count} channel(s) for {name} ({item_count} * {item_size:#x} bytes each)")
+        self.log(
+            f"Allocating {count} channel(s) for {name} ({item_count} * {item_size:#x} bytes each)"
+        )
 
-        state_obj = self.kshared.new_buf(0x30 * count, f"Channel.{name}.state", track=False)
+        state_obj = self.kshared.new_buf(
+            0x30 * count, f"Channel.{name}.state", track=False
+        )
         if rx:
-            ring_buf = self.kshared.new_buf(ring_size * count, f"Channel.{name}.ring", track=False)
+            ring_buf = self.kshared.new_buf(
+                ring_size * count, f"Channel.{name}.ring", track=False
+            )
         else:
-            ring_buf = self.kobj.new_buf(ring_size * count, f"Channel.{name}.ring", track=False)
+            ring_buf = self.kobj.new_buf(
+                ring_size * count, f"Channel.{name}.ring", track=False
+            )
 
         info = ChannelInfo()
         info.state_addr = state_obj._addr
@@ -158,10 +221,17 @@ class AGX:
         else:
             setattr(self.ch_info, name, info)
 
-        return [cls(self, name + ("" if count == 1 else f"[{i}]"), channel_id,
-                    state_obj._paddr + 0x30 * i,
-                    ring_buf._paddr + ring_size * i, item_count)
-                for i in range(count)]
+        return [
+            cls(
+                self,
+                name + ("" if count == 1 else f"[{i}]"),
+                channel_id,
+                state_obj._paddr + 0x30 * i,
+                ring_buf._paddr + ring_size * i,
+                item_count,
+            )
+            for i in range(count)
+        ]
 
     def init_channels(self):
         self.log("Initializing channels...")
@@ -175,17 +245,22 @@ class AGX:
             self.ch.queue.append(queue)
             for typeid, chtype in enumerate(("TA", "3D", "CL")):
                 name = f"{chtype}_{index}"
-                chan = self.alloc_channels(GPUCmdQueueChannel, name,
-                                           (index << 2) | typeid)[0]
+                chan = self.alloc_channels(
+                    GPUCmdQueueChannel, name, (index << 2) | typeid
+                )[0]
                 setattr(queue, "q_" + chtype, chan)
 
         # Device control channel
-        self.ch.devctrl = self.alloc_channels(GPUDeviceControlChannel, "DevCtrl", 0x11)[0]
+        self.ch.devctrl = self.alloc_channels(GPUDeviceControlChannel, "DevCtrl", 0x11)[
+            0
+        ]
 
         # GPU -> CPU channels
         self.ch.event = self.alloc_channels(GPUEventChannel, "Event", None, rx=True)[0]
         self.ch.log = self.alloc_channels(GPULogChannel, "FWLog", None, 6, rx=True)
-        self.ch.ktrace = self.alloc_channels(GPUKTraceChannel, "KTrace", None, ring_size=0x200, rx=True)[0]
+        self.ch.ktrace = self.alloc_channels(
+            GPUKTraceChannel, "KTrace", None, ring_size=0x200, rx=True
+        )[0]
         self.ch.stats = self.alloc_channels(GPUStatsChannel, "Stats", None, rx=True)[0]
 
         self.ch.fwctl = self.alloc_channels(GPUFWCtlChannel, "FWCtl", None, rx=False)[0]
@@ -205,18 +280,19 @@ class AGX:
     def kick_firmware(self):
         self.asc.db.doorbell(0x10)
 
-
     def get_irqs(self):
         hw_state = self.aic_base + 0x6800
         irqs = []
         for irq in self.sgx_dev.interrupts:
-            v = int(bool((self.p.read32(hw_state + (irq // 32) * 4) & (1 << (irq % 32)))))
+            v = int(
+                bool((self.p.read32(hw_state + (irq // 32) * 4) & (1 << (irq % 32))))
+            )
             irqs.append(v)
         return irqs
 
     def show_irqs(self):
         irqs = self.get_irqs()
-        self.log(f' SGX IRQ state: {irqs}')
+        self.log(f" SGX IRQ state: {irqs}")
 
     def check_for_halt(self):
         irqs = self.get_irqs()
@@ -224,16 +300,16 @@ class AGX:
             if self.mon:
                 self.mon.poll()
             self.poll_objects()
-            self.log(f' SGX IRQ fired, checking for halt')
+            self.log(f" SGX IRQ fired, checking for halt")
             self.wait_halt()
-            self.log(r' (\________/) ')
-            self.log(r'  |        |  ')
+            self.log(r" (\________/) ")
+            self.log(r"  |        |  ")
             self.log(r"'.| \  , / |.'")
-            self.log(r'--| / (( \ |--')
+            self.log(r"--| / (( \ |--")
             self.log(r".'|  _-_-  |'.")
-            self.log(r'  |________|  ')
-            self.log(r'')
-            self.log(r' Halted nya~!!!!!')
+            self.log(r"  |________|  ")
+            self.log(r"")
+            self.log(r" Halted nya~!!!!!")
             self.show_irqs()
             self.show_pending_stamps()
             self.check_fault()
@@ -249,18 +325,18 @@ class AGX:
             self.mon.poll()
         self.poll_objects()
         self.log(msg)
-        self.log(r' (\________/) ')
-        self.log(r'  |        |  ')
+        self.log(r" (\________/) ")
+        self.log(r"  |        |  ")
         self.log(r"'.| \  , / |.'")
-        self.log(r'--| / (( \ |--')
+        self.log(r"--| / (( \ |--")
         self.log(r".'|  _-_-  |'.")
-        self.log(r'  |________|  ')
-        self.log(r'')
-        self.log(r' Timeout nya~!!!!!')
-        self.log(r'')
-        self.log(f' Stamp index: {int(msg.stamp_index)}')
+        self.log(r"  |________|  ")
+        self.log(r"")
+        self.log(r" Timeout nya~!!!!!")
+        self.log(r"")
+        self.log(f" Stamp index: {int(msg.stamp_index)}")
         self.show_pending_stamps()
-        self.log(f' Fault info:')
+        self.log(f" Fault info:")
         self.log(self.initdata.regionC.fault_info)
 
         self.show_irqs()
@@ -272,17 +348,17 @@ class AGX:
             self.mon.poll()
         self.poll_objects()
         self.log(msg)
-        self.log(r' (\________/) ')
-        self.log(r'  |        |  ')
+        self.log(r" (\________/) ")
+        self.log(r"  |        |  ")
         self.log(r"'.| \  , / |.'")
-        self.log(r'--| / (( \ |--')
+        self.log(r"--| / (( \ |--")
         self.log(r".'|  _-_-  |'.")
-        self.log(r'  |________|  ')
-        self.log(r'')
-        self.log(r' Fault nya~!!!!!')
-        self.log(r'')
+        self.log(r"  |________|  ")
+        self.log(r"")
+        self.log(r" Fault nya~!!!!!")
+        self.log(r"")
         self.show_pending_stamps()
-        self.log(f' Fault info:')
+        self.log(f" Fault info:")
         self.log(self.initdata.regionC.fault_info)
 
         self.show_irqs()
@@ -295,21 +371,23 @@ class AGX:
         else:
             info_bits = 3
         self.initdata.regionC.pull()
-        self.log(f' Pending stamps:')
-        for (off, i) in enumerate(self.initdata.regionC.pending_stamps):
+        self.log(f" Pending stamps:")
+        for off, i in enumerate(self.initdata.regionC.pending_stamps):
             if i.info or i.wait_value:
-                self.log(f"  - [{off}] #{i.info >> info_bits:3d}: {i.info & ((1 << info_bits) - 1)}/{i.wait_value:#x}")
+                self.log(
+                    f"  - [{off}] #{i.info >> info_bits:3d}: {i.info & ((1 << info_bits) - 1)}/{i.wait_value:#x}"
+                )
             i.info = 0
             i.wait_value = 0
             tmp = i.regmap()
             tmp.info.val = 0
             tmp.wait_value.val = 0
 
-        #self.initdata.regionC.push()
+        # self.initdata.regionC.push()
 
     def check_fault(self):
         fault_info = self.sgx.FAULT_INFO.reg
-        if fault_info.value == 0xacce5515abad1dea:
+        if fault_info.value == 0xACCE5515ABAD1DEA:
             raise Exception("Got fault notification, but fault address is unreadable")
 
         self.log(f" Fault info: {fault_info}")
@@ -324,7 +402,7 @@ class AGX:
             fault_addr = fault_info.ADDR << 6
 
         if fault_addr & 0x8000000000:
-            fault_addr |= 0xffffff8000000000
+            fault_addr |= 0xFFFFFF8000000000
         base, obj = self.find_object(fault_addr, ctx=fault_info.CONTEXT)
         info = ""
         if obj is not None:
@@ -376,7 +454,7 @@ class AGX:
         self.uat.flush_dirty()
 
         self.log("Sending initdata")
-        self.asc.fw.send_initdata(self.initdata._addr & 0xfff_ffffffff)
+        self.asc.fw.send_initdata(self.initdata._addr & 0xFFF_FFFFFFFF)
         self.asc.work()
 
         self.log("Sending DC_Init")

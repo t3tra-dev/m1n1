@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: MIT
-from m1n1.constructutils import *
 from construct import *
+from m1n1.constructutils import *
+
+from ...utils import Register32, RegMap
 from .microsequence import *
-from ...utils import RegMap, Register32
 
 __all__ = []
+
 
 class WorkCommandBarrier(ConstructClass):
     """
@@ -15,17 +17,19 @@ class WorkCommandBarrier(ConstructClass):
     00000004 0c378018 ffffffa0 00000c00 00000006 00000900 08002c9a 00000000
     00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
     """
+
     subcon = Struct(
         "magic" / Const(0x4, Int32ul),
         "stamp_addr" / Int64ul,
         "stamp" / ROPointer(this.stamp_addr, StampCounter),
         "wait_value" / Int32ul,
-        "event" / Int32ul, # Event number that signals a stamp check
+        "event" / Int32ul,  # Event number that signals a stamp check
         "stamp_self" / Int32ul,
         "uuid" / Int32ul,
         "unk" / Default(Int32ul, 0),
         Ver("G >= G14X", "pad" / ZPadding(0x20)),
     )
+
 
 class WorkCommandInitBM(ConstructClass):
     """
@@ -35,40 +39,47 @@ class WorkCommandInitBM(ConstructClass):
     00000004 0c378018 ffffffa0 00000c00 00000006 00000900 08002c9a 00000000
     00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
     """
+
     subcon = Struct(
         "magic" / Const(0x6, Hex(Int32ul)),
-        "context_id" / Hex(Int32ul), # Might be context?
-        "buffer_mgr_slot" / Hex(Int32ul), # 0
-        "unk_c" / Hex(Int32ul), # 0
-        "unk_10" / Hex(Int32ul), # 0x30
+        "context_id" / Hex(Int32ul),  # Might be context?
+        "buffer_mgr_slot" / Hex(Int32ul),  # 0
+        "unk_c" / Hex(Int32ul),  # 0
+        "unk_10" / Hex(Int32ul),  # 0x30
         "buffer_mgr_addr" / Int64ul,
         "buffer_mgr" / ROPointer(this.buffer_mgr_addr, BufferManagerInfo),
         "stamp_value" / Hex(Int32ul),  # 0x100
     )
 
+
 class WorkCommandComputeUnk10(ConstructClass):
     """
-        occasionally sent before WorkCommandCP on the SubmitCP queue.
+    occasionally sent before WorkCommandCP on the SubmitCP queue.
     """
+
     subcon = Struct(
-        "magic" / Const(0xa, Hex(Int32ul)),
+        "magic" / Const(0xA, Hex(Int32ul)),
         "unk" / Hex(Int32ul),
     )
 
+
 class WorkCommandComputeUnk11(ConstructClass):
     """
-        occasionally sent before WorkCommandCP on the SubmitCP queue.
+    occasionally sent before WorkCommandCP on the SubmitCP queue.
     """
+
     subcon = Struct(
-        "magic" / Const(0xb, Hex(Int32ul)),
+        "magic" / Const(0xB, Hex(Int32ul)),
         "unk" / Hex(Int32ul),
     )
+
 
 class Flag(ConstructValueClass):
     subcon = Hex(Int32ul)
 
     def __init__(self):
         self.value = 0
+
 
 class LinkedListHead(ConstructClass):
     subcon = Struct(
@@ -81,12 +92,14 @@ class LinkedListHead(ConstructClass):
         self.prev = 0
         self.next = 0
 
+
 class EventControlUnkBuf(ConstructValueClass):
     subcon = HexDump(Bytes(0x8))
 
     def __init__(self):
         super().__init__()
         self.value = b"\xff" * 8
+
 
 class EventControl(ConstructClass):
     subcon = Struct(
@@ -119,15 +132,16 @@ class EventControl(ConstructClass):
         self.unk_20 = 0
         self.vm_slot = 0
         self.has_ta = 0
-        self.pstamp_ta = [0]*4
+        self.pstamp_ta = [0] * 4
         self.has_3d = 0
-        self.pstamp_3d = [0]*4
+        self.pstamp_3d = [0] * 4
         self.has_cp = 0
-        self.pstamp_cp = [0]*4
+        self.pstamp_cp = [0] * 4
         self.in_list = 0
         self.unk_98_g14_0 = bytes(0x14)
         self.list_head = LinkedListHead()
         self.unk_buf = EventControlUnkBuf()
+
 
 class WorkCommandCP(ConstructClass):
     """
@@ -164,7 +178,7 @@ class WorkCommandCP(ConstructClass):
         "event_control" / ROPointer(this.event_control_addr, EventControl),
         "unk_2c" / Int32ul,
         Ver("G >= G14X", "registers" / Array(128, RegisterDefinition)),
-        Ver("G >= G14X", "unk_g14x" / Default(Array(64, Int32ul), [0]*64)),
+        Ver("G >= G14X", "unk_g14x" / Default(Array(64, Int32ul), [0] * 64)),
         Ver("G < G14X", "unk_buf" / HexDump(Bytes(0x50))),
         Ver("G < G14X", "compute_info" / ComputeInfo),
         "registers_addr" / Int64ul,
@@ -179,15 +193,16 @@ class WorkCommandCP(ConstructClass):
         "job_meta" / JobMeta,
         "ts1" / TimeStamp,
         "ts_pointers" / TimeStampPointers,
-        "user_ts_pointers" / TimeStampPointers, # This is a guess, but it makes sense
+        "user_ts_pointers" / TimeStampPointers,  # This is a guess, but it makes sense
         "client_sequence" / Int8ul,
         Ver("V >= V13_0B4", "unk_ts2" / TimeStamp),
         Ver("V >= V13_0B4", "unk_ts" / TimeStamp),
-        Ver("V >= V13_0B4", "unk_2e1" / Default(HexDump(Bytes(0x1c)), bytes(0x1c))),
+        Ver("V >= V13_0B4", "unk_2e1" / Default(HexDump(Bytes(0x1C)), bytes(0x1C))),
         Ver("V >= V13_0B4", "unk_flag" / Flag),
         Ver("V >= V13_0B4", "unk_pad" / Default(HexDump(Bytes(0x10)), bytes(0x10))),
         "pad_2d9" / Default(HexDump(Bytes(0x7)), bytes(0x7)),
     )
+
 
 class WorkCommand0_UnkBuf(ConstructValueClass):
     subcon = HexDump(Bytes(0x18))
@@ -195,11 +210,13 @@ class WorkCommand0_UnkBuf(ConstructValueClass):
     def __init__(self):
         self.value = bytes(0x18)
 
+
 class WorkCommand1_UnkBuf(ConstructValueClass):
     subcon = HexDump(Bytes(0x110))
 
     def __init__(self):
         self.value = bytes(0x110)
+
 
 class WorkCommand1_UnkBuf2(ConstructClass):
     subcon = Struct(
@@ -207,6 +224,7 @@ class WorkCommand1_UnkBuf2(ConstructClass):
         "unk_8" / Int64ul,
         "unk_10" / Int64ul,
     )
+
 
 class WorkCommand3D(ConstructClass):
     """
@@ -240,7 +258,7 @@ class WorkCommand3D(ConstructClass):
         Ver("V >= V13_0B4", "counter" / Int64ul),
         "context_id" / Hex(Int32ul),
         "unk_8" / Hex(Int32ul),
-        "microsequence_ptr" / Hex(Int64ul), # Command list
+        "microsequence_ptr" / Hex(Int64ul),  # Command list
         "microsequence_size" / Hex(Int32ul),
         "microsequence" / ROPointer(this.microsequence_ptr, MicroSequence),
         "event_control_addr" / Hex(Int64ul),
@@ -253,8 +271,8 @@ class WorkCommand3D(ConstructClass):
         "tvb_tilemap" / Hex(Int64ul),
         "unk_40" / Hex(Int64ul),
         "unk_48" / Hex(Int32ul),
-        "tile_blocks_y" / Hex(Int16ul), # * 4
-        "tile_blocks_x" / Hex(Int16ul), # * 4
+        "tile_blocks_y" / Hex(Int16ul),  # * 4
+        "tile_blocks_x" / Hex(Int16ul),  # * 4
         "unk_50" / Hex(Int64ul),
         "unk_58" / Hex(Int64ul),
         "merge_upper_x" / Hex(Float32l),
@@ -265,7 +283,7 @@ class WorkCommand3D(ConstructClass):
         Ver("G < G14X", "struct_2" / Start3DStruct2),
         Ver("G < G14X", "struct_1" / Start3DStruct1),
         Ver("G >= G14X", "registers" / Array(128, RegisterDefinition)),
-        Ver("G >= G14X", "unk_g14x" / Default(Array(64, Int32ul), [0]*64)),
+        Ver("G >= G14X", "unk_g14x" / Default(Array(64, Int32ul), [0] * 64)),
         "struct_3" / Start3DStruct3,
         "unk_758" / Flag,
         "unk_75c" / Flag,
@@ -276,14 +294,15 @@ class WorkCommand3D(ConstructClass):
         "unk_buf2" / WorkCommand1_UnkBuf2,
         "ts1" / TimeStamp,
         "ts_pointers" / TimeStampPointers,
-        "user_ts_pointers" / TimeStampPointers, # This is a guess, but it makes sense
+        "user_ts_pointers" / TimeStampPointers,  # This is a guess, but it makes sense
         "client_sequence" / Int8ul,
         Ver("V >= V13_0B4", "unk_ts2" / TimeStamp),
         Ver("V >= V13_0B4", "unk_ts" / TimeStamp),
         Ver("V >= V13_0B4", "unk_pad3" / Default(HexDump(Bytes(0x20)), bytes(0x20))),
         "pad_925" / Default(HexDump(Bytes(0x3)), bytes(0x3)),
-        Ver("V == V13_3", "unk_pad2" / Default(HexDump(Bytes(0x3c)), bytes(0x3c))),
+        Ver("V == V13_3", "unk_pad2" / Default(HexDump(Bytes(0x3C)), bytes(0x3C))),
     )
+
 
 class WorkCommand0_UnkBuf(ConstructValueClass):
     subcon = HexDump(Bytes(0x18))
@@ -291,6 +310,7 @@ class WorkCommand0_UnkBuf(ConstructValueClass):
     def __init__(self):
         super().__init__()
         self.value = bytes(0x18)
+
 
 class WorkCommandTA(ConstructClass):
     """
@@ -330,14 +350,17 @@ class WorkCommandTA(ConstructClass):
         "buf_thing" / ROPointer(this.buf_thing_addr, BufferThing),
         "unk_emptybuf_addr" / Hex(Int64ul),
         "unk_34" / Hex(Int32ul),
-
         # Embedded structures that are also pointed to by other stuff
         Ver("G >= G14X", "registers" / Array(128, RegisterDefinition)),
-        Ver("G >= G14X", "unk_154" / Default(HexDump(Bytes(0x100)), bytes(0x100))), # unknown
-        Ver("G < G14X", "struct_2" / StartTACmdStruct2), # 0x11c bytes
-        Ver("G < G14X", "unk_154" / Default(HexDump(Bytes(0x268)), bytes(0x268))), # unknown
-        Ver("G < G14X", "tiling_params" / TilingParameters), # unknown
-        Ver("G < G14X", "unk_3e8" / HexDump(Bytes(0x60))), # unknown
+        Ver(
+            "G >= G14X", "unk_154" / Default(HexDump(Bytes(0x100)), bytes(0x100))
+        ),  # unknown
+        Ver("G < G14X", "struct_2" / StartTACmdStruct2),  # 0x11c bytes
+        Ver(
+            "G < G14X", "unk_154" / Default(HexDump(Bytes(0x268)), bytes(0x268))
+        ),  # unknown
+        Ver("G < G14X", "tiling_params" / TilingParameters),  # unknown
+        Ver("G < G14X", "unk_3e8" / HexDump(Bytes(0x60))),  # unknown
         "registers_addr" / Int64ul,
         "register_count" / Int16ul,
         "registers_length" / Int16ul,
@@ -349,23 +372,20 @@ class WorkCommandTA(ConstructClass):
         "microsequence" / ROPointer(this.microsequence_ptr, MicroSequence),
         "ev_3d" / Int32ul,
         "stamp_value" / Int32ul,
-
-        "struct_3" / StartTACmdStruct3, # 0x114 bytes
-
+        "struct_3" / StartTACmdStruct3,  # 0x114 bytes
         "unk_594" / WorkCommand0_UnkBuf,
-
         "ts1" / TimeStamp,
         "ts_pointers" / TimeStampPointers,
-        "user_ts_pointers" / TimeStampPointers, # This is a guess, but it makes sense
-
+        "user_ts_pointers" / TimeStampPointers,  # This is a guess, but it makes sense
         "client_sequence" / Int8ul,
         Ver("V >= V13_0B4", "unk_ts2" / TimeStamp),
         Ver("V >= V13_0B4", "unk_ts" / TimeStamp),
         Ver("V >= V13_0B4", "unk_5d8_15" / Default(HexDump(Bytes(0x18)), bytes(0x18))),
         "pad_5d5" / Default(HexDump(Bytes(0x3)), bytes(0x3)),
         "pad_5d8" / Default(HexDump(Bytes(0x8)), bytes(0x8)),
-        Ver("V >= V13_3", "unk_pad2" / Default(HexDump(Bytes(0xc)), bytes(0xc))),
+        Ver("V >= V13_3", "unk_pad2" / Default(HexDump(Bytes(0xC)), bytes(0xC))),
     )
+
 
 class WorkCommandBlit(ConstructClass):
     subcon = Struct(
@@ -379,7 +399,7 @@ class WorkCommandBlit(ConstructClass):
         "unk_14" / Int32ul,
         Ver("G < G14X", "blit_info" / BlitInfo),
         Ver("G >= G14X", "registers" / Array(128, RegisterDefinition)),
-        Ver("G >= G14X", "unk_g14x" / Default(Array(64, Int32ul), [0]*64)),
+        Ver("G >= G14X", "unk_g14x" / Default(Array(64, Int32ul), [0] * 64)),
         "registers_addr" / Int64ul,
         "register_count" / Int16ul,
         "registers_length" / Int16ul,
@@ -405,6 +425,7 @@ class WorkCommandBlit(ConstructClass):
         "pad_64d" / Default(HexDump(Bytes(0x7)), bytes(0x7)),
     )
 
+
 class UnknownWorkCommand(ConstructClass):
     subcon = Struct(
         "magic" / Hex(Int32ul),
@@ -417,20 +438,26 @@ class UnknownWorkCommand(ConstructClass):
         "unk_1c" / Hex(Int32ul),
     )
 
+
 class CmdBufWork(ConstructClass):
     subcon = Struct(
         "cmdid" / Peek(Int32ul),
-        "cmd" / Switch(this.cmdid, {
-            0: WorkCommandTA,
-            1: WorkCommand3D,
-            2: WorkCommandBlit,
-            3: WorkCommandCP,
-            4: WorkCommandBarrier,
-            6: WorkCommandInitBM,
-            10: WorkCommandComputeUnk10,
-            11: WorkCommandComputeUnk11,
-        })
+        "cmd"
+        / Switch(
+            this.cmdid,
+            {
+                0: WorkCommandTA,
+                1: WorkCommand3D,
+                2: WorkCommandBlit,
+                3: WorkCommandCP,
+                4: WorkCommandBarrier,
+                6: WorkCommandInitBM,
+                10: WorkCommandComputeUnk10,
+                11: WorkCommandComputeUnk11,
+            },
+        ),
     )
+
 
 class JobList(ConstructClass):
     subcon = Struct(
@@ -438,6 +465,7 @@ class JobList(ConstructClass):
         "last_head" / Int64ul,
         "unkptr_10" / Default(Int64ul, 0),
     )
+
 
 class GPUContextData(ConstructClass):
     subcon = Struct(
@@ -455,12 +483,12 @@ class GPUContextData(ConstructClass):
         "unk_1f" / Int8ul,
         "unk_20" / Default(Bytes(3), bytes(3)),
         "unk_23" / Int8ul,
-        "unk_24" / Default(Bytes(0x1c), bytes(0x1c)),
+        "unk_24" / Default(Bytes(0x1C), bytes(0x1C)),
     )
 
     def __init__(self):
-        self.queue_table_index = 0xff
-        self.pid_table_index = 0xff
+        self.queue_table_index = 0xFF
+        self.pid_table_index = 0xFF
         self.unk_5 = 1
         self.unk_6 = 0
         self.unk_a = 0
@@ -468,14 +496,16 @@ class GPUContextData(ConstructClass):
         self.unk_12 = 0
         self.unk_16 = 0
         self.unk_1a = 0
-        self.unk_1e = 0xff
+        self.unk_1e = 0xFF
         self.unk_1f = 0
         self.unk_23 = 2
+
 
 class CommandQueuePointerMap(RegMap):
     GPU_DONEPTR = 0x00, Register32
     GPU_RPTR = 0x30, Register32
     CPU_WPTR = 0x40, Register32
+
 
 class CommandQueuePointers(ConstructClass):
     subcon = Struct(
@@ -502,37 +532,40 @@ class CommandQueuePointers(ConstructClass):
         self.cpu_wptr = 0
         self.rb_size = 0x500
 
+
 class CommandQueueInfo(ConstructClass):
-    """ Structure type shared by Submit3D, SubmitTA and SubmitCompute
-        Applications have multiple of these, one of each submit type
-        TODO: Can applications have more than one of each type? One per encoder?
-        Mostly managed by GPU, only initialize by CPU
+    """Structure type shared by Submit3D, SubmitTA and SubmitCompute
+    Applications have multiple of these, one of each submit type
+    TODO: Can applications have more than one of each type? One per encoder?
+    Mostly managed by GPU, only initialize by CPU
 
     """
+
     subcon = Struct(
         "pointers_addr" / Hex(Int64ul),
         "pointers" / ROPointer(this.pointers_addr, CommandQueuePointers),
-        "rb_addr" / Hex(Int64ul), # 0x4ff pointers
-        "job_list_addr" / Hex(Int64ul), # ffffffa000000000, size 0x18 (shared by 3D and TA)
+        "rb_addr" / Hex(Int64ul),  # 0x4ff pointers
+        "job_list_addr"
+        / Hex(Int64ul),  # ffffffa000000000, size 0x18 (shared by 3D and TA)
         "job_list" / ROPointer(this.job_list_addr, JobList),
-        "gpu_buf_addr" / Hex(Int64ul), # GPU space for this queue, 0x2c18 bytes?
-        #"gpu_buf" / ROPointer(this.gpu_buf_addr, HexDump(Bytes(0x2c18))),
+        "gpu_buf_addr" / Hex(Int64ul),  # GPU space for this queue, 0x2c18 bytes?
+        # "gpu_buf" / ROPointer(this.gpu_buf_addr, HexDump(Bytes(0x2c18))),
         "gpu_rptr1" / Hex(Int32ul),
         "gpu_rptr2" / Hex(Int32ul),
         "gpu_rptr3" / Hex(Int32ul),
         "event_id" / Int32sl,
-        "priority" / Hex(Int32ul), # read by CPU
+        "priority" / Hex(Int32ul),  # read by CPU
         "unk_34" / Hex(Int32ul),
         "unk_38" / Hex(Int64ul),
-        "unk_40" / Hex(Int32ul), # 1
-        "unk_44" / Hex(Int32ul), # 0
-        "prio5" / Hex(Int32ul), # 1, 2
-        "unk_4c" / Int32sl, # -1
-        "uuid" / Hex(Int32ul), # Counts up for each new process or command queue
+        "unk_40" / Hex(Int32ul),  # 1
+        "unk_44" / Hex(Int32ul),  # 0
+        "prio5" / Hex(Int32ul),  # 1, 2
+        "unk_4c" / Int32sl,  # -1
+        "uuid" / Hex(Int32ul),  # Counts up for each new process or command queue
         "unk_54" / Int32sl,
-        "unk_58" / Hex(Int64ul), # 0
-        "busy" / Hex(Int32ul), # 1 = gpu busy
-        "pad1" / ZPadding(0x1c),
+        "unk_58" / Hex(Int64ul),  # 0
+        "busy" / Hex(Int32ul),  # 1 = gpu busy
+        "pad1" / ZPadding(0x1C),
         "unk_80" / Hex(Int32ul),
         "has_commands" / Hex(Int32ul),
         "unk_88" / Int32ul,
@@ -542,7 +575,10 @@ class CommandQueueInfo(ConstructClass):
         "inflight_commands" / Int32ul,
         "unk_9c" / Int32ul,
         Ver("V >= V13_2 && G < G14X", "unk_a0_0" / Int32ul),
-        "gpu_context_addr" / Hex(Int64ul), # GPU managed context, shared between 3D and TA. Passed to DC_DestroyContext
+        "gpu_context_addr"
+        / Hex(
+            Int64ul
+        ),  # GPU managed context, shared between 3D and TA. Passed to DC_DestroyContext
         "gpu_context" / ROPointer(this.gpu_context_addr, GPUContextData),
         "unk_a8" / Int64ul,
         Ver("V >= V13_2 && G < G14X", "unk_b0" / Int32ul),
@@ -556,7 +592,7 @@ class CommandQueueInfo(ConstructClass):
         self.gpu_rptr3 = 0
         self.event_id = -1
         self.unk_4c = -1
-        self.uuid = 0xdeadbeef # some kind of ID
+        self.uuid = 0xDEADBEEF  # some kind of ID
         self.unk_54 = -1
         self.unk_58 = 0x0
         self.busy = 0x0
@@ -576,22 +612,22 @@ class CommandQueueInfo(ConstructClass):
     def set_prio(self, p):
         if p == 0:
             self.priority = 0
-            self.unk_34 = 0 # 0-3?
-            self.unk_38 = 0xffff_ffff_ffff_0000
+            self.unk_34 = 0  # 0-3?
+            self.unk_38 = 0xFFFF_FFFF_FFFF_0000
             self.unk_40 = 1
             self.unk_44 = 0
             self.prio5 = 1
         elif p == 1:
             self.priority = 1
             self.unk_34 = 1
-            self.unk_38 = 0xffff_ffff_0000_0000
+            self.unk_38 = 0xFFFF_FFFF_0000_0000
             self.unk_40 = 0
             self.unk_44 = 0
             self.prio5 = 0
         elif p == 2:
             self.priority = 2
             self.unk_34 = 2
-            self.unk_38 = 0xffff_0000_0000_0000
+            self.unk_38 = 0xFFFF_0000_0000_0000
             self.unk_40 = 0
             self.unk_44 = 0
             self.prio5 = 2
@@ -603,5 +639,9 @@ class CommandQueueInfo(ConstructClass):
             self.unk_44 = 0
             self.prio5 = 3
 
-__all__.extend(k for k, v in globals().items()
-               if (callable(v) or isinstance(v, type)) and v.__module__ == __name__)
+
+__all__.extend(
+    k
+    for k, v in globals().items()
+    if (callable(v) or isinstance(v, type)) and v.__module__ == __name__
+)

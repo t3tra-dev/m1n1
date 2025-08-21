@@ -2,7 +2,7 @@
 
 from m1n1.trace.gpio import GPIOTracer
 
-#trace_device("/arm-io/gpio", True)
+# trace_device("/arm-io/gpio", True)
 
 # trace gpio interrupts, useful to follow the cascaded interrupts
 aic_phandle = getattr(hv.adt["/arm-io/aic"], "AAPL,phandle")
@@ -24,15 +24,15 @@ PIN_NAMES_j274 = {
     0xC7: "i2c1:sda",
     0xA3: "i2c2:scl",
     0xA2: "i2c2:sda",
-    106:  "hpm:irq",
-    136:  "bluetooth:irq",
-    196:  "wlan:irq",
-    183:  "cs42l83:irq",
-    182:  "tas5770:irq",
-    152:  "pci@0,0",
-    153:  "pci@1,0",
-    33:   "pci@2,0",
-    #0x2D: "spi_nor:CS",
+    106: "hpm:irq",
+    136: "bluetooth:irq",
+    196: "wlan:irq",
+    183: "cs42l83:irq",
+    182: "tas5770:irq",
+    152: "pci@0,0",
+    153: "pci@1,0",
+    33: "pci@2,0",
+    # 0x2D: "spi_nor:CS",
 }
 
 GPIOTracer = GPIOTracer._reloadcls()

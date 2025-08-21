@@ -1,14 +1,23 @@
 # SPDX-License-Identifier: MIT
-import errno, io, os, pkgutil, re, selectors, socketserver, threading, traceback
+import errno
+import io
+import os
+import pkgutil
+import re
+import selectors
+import socketserver
+import threading
+import traceback
+
 from construct import Array, BytesInteger, Container, Int32ul, Int64ul, Struct
 
 from ...proxy import *
 from ...sysreg import *
 from ...utils import *
-
 from ..types import *
 
 __all__ = ["GDBServer"]
+
 
 class GDBServer:
     __g = Struct(
@@ -30,7 +39,9 @@ class GDBServer:
         self.__request = None
         self.log = log
 
-        self.__interrupt_selector.register(self.__interrupt_eventfd, selectors.EVENT_READ)
+        self.__interrupt_selector.register(
+            self.__interrupt_eventfd, selectors.EVENT_READ
+        )
 
         handle = self.__handle
 
@@ -39,7 +50,9 @@ class GDBServer:
                 handle(self.request)
 
         self.__server = socketserver.UnixStreamServer(address, Handler, False)
-        self.__thread = threading.Thread(target=self.__server.serve_forever,)
+        self.__thread = threading.Thread(
+            target=self.__server.serve_forever,
+        )
 
     def __add_wp(self, addr, kind, lsc):
         start = addr & 7
@@ -90,7 +103,9 @@ class GDBServer:
         except BlockingIOError:
             pass
 
-        while not self.__interrupt_eventfd in (key.fileobj for key, mask in self.__interrupt_selector.select()):
+        while not self.__interrupt_eventfd in (
+            key.fileobj for key, mask in self.__interrupt_selector.select()
+        ):
             recv = self.__request.recv(1)
             if not recv:
                 break
@@ -183,7 +198,7 @@ class GDBServer:
 
         if data[0] in b"M":
             split = GDBServer.__separator.split(data[1:].decode(), maxsplit=2)
-            mem = bytes.fromhex(split[2])[:int(split[1], 16)]
+            mem = bytes.fromhex(split[2])[: int(split[1], 16)]
             if self.__hv.writemem(int(split[0], 16), mem) < len(mem):
                 return "E22"
 
@@ -217,7 +232,9 @@ class GDBServer:
             reg = bytes.fromhex(partition[2].decode())
             self.__cpu(self.__hg)
             if number < 31:
-                self.__hv.ctx.regs[number] = GDBServer.__g.regs.subcon.subcon.unpack(reg)
+                self.__hv.ctx.regs[number] = GDBServer.__g.regs.subcon.subcon.unpack(
+                    reg
+                )
             elif number == 31:
                 self.__hv.ctx.regs[1] = GDBServer.__g.regs.subcon.subcon.unpack(reg)
             elif number == 32:
@@ -243,7 +260,10 @@ class GDBServer:
                 return b"QC" + bytes(format(cpu_id, "x"), "utf-8")
 
             if split[0] == "fThreadInfo":
-                cpu_ids = b",".join(bytes(format(cpu.cpu_id, "x"), "utf-8") for cpu in self.__hv.adt["cpus"])
+                cpu_ids = b",".join(
+                    bytes(format(cpu.cpu_id, "x"), "utf-8")
+                    for cpu in self.__hv.adt["cpus"]
+                )
                 return b"m" + cpu_ids
 
             if split[0] == "sThreadInfo":
@@ -275,14 +295,20 @@ class GDBServer:
 
                     request_offset = int(xfer[3], 16)
                     request_len = int(xfer[4], 16)
-                    read = annex[request_offset:request_offset + request_len]
+                    read = annex[request_offset : request_offset + request_len]
                     return (b"l" if len(read) < request_len else b"m") + read
 
                 return b""
 
             if split[0] == "HostInfo":
-                addressing_bits = bytes(str(64 - self.__hv.pac_mask.bit_count()), "utf-8")
-                return b"cputype:16777228;cpusubtype:2;endian:little;ptrsize:64;watchpoint_exceptions_received:before;addressing_bits:" + addressing_bits + b";"
+                addressing_bits = bytes(
+                    str(64 - self.__hv.pac_mask.bit_count()), "utf-8"
+                )
+                return (
+                    b"cputype:16777228;cpusubtype:2;endian:little;ptrsize:64;watchpoint_exceptions_received:before;addressing_bits:"
+                    + addressing_bits
+                    + b";"
+                )
 
             return b""
 
@@ -304,7 +330,7 @@ class GDBServer:
         if data[0] in b"X":
             partition = data[1:].partition(b":")
             split = GDBServer.__separator.split(partition[0].decode(), maxsplit=1)
-            mem = partition[2][:int(split[1], 16)]
+            mem = partition[2][: int(split[1], 16)]
             if self.__hv.writemem(int(split[0], 16), mem) < len(mem):
                 return b"E22"
 
@@ -407,9 +433,9 @@ class GDBServer:
                         input_buffer = input_buffer[dollar:]
                         break
 
-                    input_data = input_buffer[dollar + 1:sharp]
-                    input_checksum = input_buffer[sharp + 1:sharp + 3]
-                    input_buffer = input_buffer[sharp + 3:]
+                    input_data = input_buffer[dollar + 1 : sharp]
+                    input_checksum = input_buffer[sharp + 1 : sharp + 3]
+                    input_buffer = input_buffer[sharp + 3 :]
 
                     try:
                         parsed_input_checksum = int(input_checksum.decode(), 16)
@@ -439,7 +465,9 @@ class GDBServer:
                             elif input_data[input_index] == b"}":
                                 input_decoded.write(input_data[input_last:input_index])
                                 input_index += 1
-                                input_decoded.write(bytes([input_data[input_index] ^ 0x20]))
+                                input_decoded.write(
+                                    bytes([input_data[input_index] ^ 0x20])
+                                )
                                 input_index += 1
                                 input_last = input_index
                             else:
@@ -450,7 +478,9 @@ class GDBServer:
                         try:
                             output_decoded = self.__eval(input_decoded.getvalue())
                         except Exception:
-                            output_decoded = b"E." + bytes(traceback.format_exc(), "utf-8")
+                            output_decoded = b"E." + bytes(
+                                traceback.format_exc(), "utf-8"
+                            )
 
                     self.__send(b"$", output_decoded)
         finally:

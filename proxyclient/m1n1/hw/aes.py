@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
-from ..utils import *
-from enum import IntEnum
-from .dart import DART
 import struct
 from enum import IntEnum
+
+from ..utils import *
+from .dart import DART
 
 
 class AES_OPCODE(IntEnum):

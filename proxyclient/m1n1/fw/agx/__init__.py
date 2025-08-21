@@ -1,35 +1,40 @@
 # SPDX-License-Identifier: MIT
-from ...utils import *
 from ...malloc import Heap
-
+from ...utils import *
 from ..asc import StandardASC
 from ..asc.base import ASCBaseEndpoint, msg_handler
-
 from .initdata import InitData, IOMapping
 
 __all__ = []
 
+
 class GpuMsg(Register64):
-    TYPE    = 63, 48
+    TYPE = 63, 48
+
 
 class InitMsg(GpuMsg):
-    TYPE        = 63, 48, Constant(0x81)
-    UNK         = 47, 44, Constant(0)
-    INITDATA    = 43, 0
+    TYPE = 63, 48, Constant(0x81)
+    UNK = 47, 44, Constant(0)
+    INITDATA = 43, 0
+
 
 class EventMsg(GpuMsg):
-    TYPE        = 63, 48, Constant(0x42)
-    UNK         = 47, 0, Constant(0)
+    TYPE = 63, 48, Constant(0x42)
+    UNK = 47, 0, Constant(0)
+
 
 class DoorbellMsg(GpuMsg):
-    TYPE        = 63, 48, Constant(0x83)
-    CHANNEL     = 15, 0
+    TYPE = 63, 48, Constant(0x83)
+    CHANNEL = 15, 0
+
 
 class FWCtlMsg(GpuMsg):
-    TYPE        = 63, 48, Constant(0x84)
+    TYPE = 63, 48, Constant(0x84)
+
 
 class HaltMsg(GpuMsg):
-    TYPE        = 63, 48, Constant(0x85)
+    TYPE = 63, 48, Constant(0x85)
+
 
 class FirmwareEP(ASCBaseEndpoint):
     BASE_MESSAGE = GpuMsg
@@ -37,7 +42,7 @@ class FirmwareEP(ASCBaseEndpoint):
 
     @msg_handler(0x42)
     def event(self, msg):
-        #self.log("Received event")
+        # self.log("Received event")
         self.asc.agx.poll_channels()
         return True
 
@@ -46,18 +51,20 @@ class FirmwareEP(ASCBaseEndpoint):
         msg = InitMsg(INITDATA=addr)
         self.send(msg)
 
+
 class DoorbellEP(ASCBaseEndpoint):
     BASE_MESSAGE = DoorbellMsg
     SHORT = "db"
 
     def doorbell(self, channel):
-        #self.log(f"Sending doorbell ch={channel}")
-        msg = DoorbellMsg(CHANNEL = channel)
+        # self.log(f"Sending doorbell ch={channel}")
+        msg = DoorbellMsg(CHANNEL=channel)
         self.send(msg)
 
     def fwctl_doorbell(self):
         msg = FWCtlMsg()
         self.send(msg)
+
 
 class AGXASC(StandardASC):
     ENDPOINTS = {
@@ -75,7 +82,9 @@ class AGXASC(StandardASC):
         if base is None:
             return super().addr(addr)
 
-        return f"{addr:#x} ({obj._name} [{obj._size:#x}] @ {base:#x} + {addr - base:#x})"
+        return (
+            f"{addr:#x} ({obj._name} [{obj._size:#x}] @ {base:#x} + {addr - base:#x})"
+        )
 
     def iomap(self, addr, size):
         return self.uat.iomap(0, addr, size)
@@ -94,5 +103,9 @@ class AGXASC(StandardASC):
     def iotranslate(self, dva, size, ctx=0):
         return self.uat.iotranslate(ctx, dva & 0xFFFFFFFFFF, size)
 
-__all__.extend(k for k, v in globals().items()
-               if (callable(v) or isinstance(v, type)) and v.__module__ == __name__)
+
+__all__.extend(
+    k
+    for k, v in globals().items()
+    if (callable(v) or isinstance(v, type)) and v.__module__ == __name__
+)

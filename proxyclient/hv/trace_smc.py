@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: MIT
 
 import struct
-
 from enum import IntEnum
 
-from m1n1.proxyutils import RegMonitor
-from m1n1.utils import *
-from m1n1.trace.dart import DARTTracer
-from m1n1.trace.asc import ASCTracer, EP, EPState, msg, msg_log, DIR
 from m1n1.fw.smc import *
+from m1n1.proxyutils import RegMonitor
+from m1n1.trace.asc import DIR, EP, ASCTracer, EPState, msg, msg_log
+from m1n1.trace.dart import DARTTracer
+from m1n1.utils import *
 
 ASCTracer = ASCTracer._reloadcls()
+
 
 class SMCEpTracer(EP):
     BASE_MESSAGE = SMCMessage
@@ -85,7 +85,9 @@ class SMCEpTracer(EP):
             elif msgtype == SMC_GET_KEY_INFO:
                 data = self.hv.iface.readmem(self.state.sram_addr, 6)
                 size, type, flags = struct.unpack("B4sB", data)
-                self.log(f"[{msg.ID:x}] <Info: <{key}>: size={size} type={type.decode('ascii')} flags={flags:#x}")
+                self.log(
+                    f"[{msg.ID:x}] <Info: <{key}>: size={size} type={type.decode('ascii')} flags={flags:#x}"
+                )
                 return True
 
             elif msgtype == SMC_GET_KEY_BY_INDEX:
@@ -96,13 +98,13 @@ class SMCEpTracer(EP):
         self.log(f"[{msg.ID:x}] <OK {msg!r}")
         return True
 
+
 class SMCTracer(ASCTracer):
-    ENDPOINTS = {
-        0x20: SMCEpTracer
-    }
+    ENDPOINTS = {0x20: SMCEpTracer}
 
     def handle_msg(self, direction, r0, r1):
         super().handle_msg(direction, r0, r1)
+
 
 smc_tracer = SMCTracer(hv, "/arm-io/smc", verbose=1)
 smc_tracer.start()

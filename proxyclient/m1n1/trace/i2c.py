@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: MIT
 
 from ..hv import TraceMode
-from ..utils import *
 from ..hw import i2c
+from ..utils import *
 from . import ADTDevTracer
+
 
 class I2CTracer(ADTDevTracer):
     DEFAULT_MODE = TraceMode.ASYNC
@@ -30,7 +31,7 @@ class I2CTracer(ADTDevTracer):
             self.state.txn += [None] * d
         else:
             self.state.txn.append(d)
-        
+
         if mtxfifo.STOP:
             self.state.txn.append("P")
             self.flush_txn()
@@ -89,6 +90,7 @@ class I2CTracer(ADTDevTracer):
         device.i2c_tracer = self
         self.state.devices[addr] = device
 
+
 class I2CDevTracer(Reloadable):
     def __init__(self, addr=None, name=None, verbose=True):
         self.addr = addr
@@ -120,6 +122,7 @@ class I2CDevTracer(Reloadable):
     def write(self, data):
         self.txn.append(f"{data:02x}")
 
+
 class I2CRegCache:
     def __init__(self):
         self.cache = {}
@@ -135,6 +138,7 @@ class I2CRegCache:
 
     def write(self, addr, data, width):
         raise NotImplementedError("No write on I2CRegCache")
+
 
 class I2CRegMapTracer(I2CDevTracer):
     REGMAP = RegMap
@@ -170,15 +174,14 @@ class I2CRegMapTracer(I2CDevTracer):
             return False
 
         self.regbytes.append(data)
-        if len(self.regbytes)*8 >= self.pageshift:
-            immediate = int.from_bytes(bytes(self.regbytes),
-                                    byteorder="big")
+        if len(self.regbytes) * 8 >= self.pageshift:
+            immediate = int.from_bytes(bytes(self.regbytes), byteorder="big")
             self.reg = self.page << self.pageshift | immediate
         return True
 
     @property
     def reg_imm(self):
-        '''Returns the 'immediate' part of current register address'''
+        """Returns the 'immediate' part of current register address"""
         return self.reg & ~(~0 << self.pageshift)
 
     def handle_page_register(self, data):
@@ -189,7 +192,7 @@ class I2CRegMapTracer(I2CDevTracer):
             return False
 
         shift = 8 * self.reg_imm
-        self.page &= ~(0xff << shift)
+        self.page &= ~(0xFF << shift)
         self.page |= data << shift
         return True
 

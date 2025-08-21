@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: MIT
 
-from m1n1.utils import *
 from m1n1.constructutils import Ver
 from m1n1.fw.dcp.ipc import *
+from m1n1.utils import *
+
 
 class DCPAVPropHandler:
     def __init__(self):
@@ -10,7 +11,7 @@ class DCPAVPropHandler:
 
     def setDCPAVPropStart(self, length):
         # print(f"setDCPAVPropStart({length:#x})")
-        self.dcpav_prop_len = length - 1 # off by one?
+        self.dcpav_prop_len = length - 1  # off by one?
         self.dcpav_prop_off = 0
         self.dcpav_prop_data = []
         return True
@@ -38,8 +39,15 @@ def parse_log(fd):
         optype, args = line.split(" ", 1)
         if optype == "CALL":
             d, msg, chan, off, msg, in_size, out_size, in_data = args.split(" ")
-            op = Call(d, chan, int(off, 0), msg, int(in_size, 0), int(out_size, 0),
-                      bytes.fromhex(in_data))
+            op = Call(
+                d,
+                chan,
+                int(off, 0),
+                msg,
+                int(in_size, 0),
+                int(out_size, 0),
+                bytes.fromhex(in_data),
+            )
             op_stack.setdefault(chan, []).append(op)
         elif optype == "ACK":
             d, msg, chan, off, out_data = args.split(" ")
@@ -57,6 +65,7 @@ def parse_log(fd):
 
         yield op
 
+
 def dump_log(fd):
     nesting = {
         "": 0,
@@ -70,7 +79,7 @@ def dump_log(fd):
         if Ver.check("V < V13_5"):
             dcpavprop_cbs = ["D122", "D123", "D124"]
         else:
-             dcpavprop_cbs = ["D126", "D127", "D128"]
+            dcpavprop_cbs = ["D126", "D127", "D128"]
         if not op.complete and op.msg in dcpavprop_cbs:
             method = op.get_method()
             if op.msg == dcpavprop_cbs[0]:
@@ -89,6 +98,8 @@ def dump_log(fd):
             nesting[ctx] -= 1
             op.print_reply(indent=ctx + "  " * nesting.setdefault(ctx, 0))
 
+
 if __name__ == "__main__":
     import sys
+
     dump_log(open(sys.argv[1]))

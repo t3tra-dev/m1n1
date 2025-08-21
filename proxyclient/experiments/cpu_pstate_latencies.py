@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib, time
+import pathlib
+import sys
+import time
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 from m1n1.setup import *
+
 from m1n1 import asm
 
 p.smp_start_secondaries()
@@ -19,16 +23,16 @@ chip_id = u.adt["/chosen"].chip_id
 
 if chip_id in (0x8103, 0x6000, 0x6001, 0x6002):
     CREG = [
-        0x210e00000,
-        0x211e00000,
+        0x210E00000,
+        0x211E00000,
     ]
 
     MAX_PSTATE = [5, 15]
 
 elif chip_id in (0x8121, 0x6020, 0x6021, 0x6022):
     CREG = [
-        0x210e00000,
-        0x211e00000,
+        0x210E00000,
+        0x211E00000,
     ]
 
     if u.adt["/chosen"].target_type == "J416c":
@@ -38,7 +42,8 @@ elif chip_id in (0x8121, 0x6020, 0x6021, 0x6022):
 
 code = u.malloc(0x1000)
 
-util = asm.ARMAsm(f"""
+util = asm.ARMAsm(
+    f"""
 bench:
     mrs x1, CNTPCT_EL0
 1:
@@ -82,10 +87,13 @@ timelog:
     cbnz x1, 1b
     
     ret
-""", code)
+""",
+    code,
+)
 iface.writemem(code, util.data)
 p.dc_cvau(code, len(util.data))
 p.ic_ivau(code, len(util.data))
+
 
 def bench_cpu(idx, loops=10000000):
     if u.adt["cpus"][idx].state == "running":
@@ -97,33 +105,38 @@ def bench_cpu(idx, loops=10000000):
     mhz = (loops / elapsed) / 1000000
     return mhz
 
+
 def set_pstate(cluster, pstate):
-    p.mask64(CREG[cluster] + CLUSTER_PSTATE, 0x1f01f, (1<<25) | pstate)
+    p.mask64(CREG[cluster] + CLUSTER_PSTATE, 0x1F01F, (1 << 25) | pstate)
+
 
 print()
 
 LOG_ITERS = 10000
 logbuf = u.malloc(LOG_ITERS * 16)
 
+
 def bench_latency(cluster, cpu, from_pstate, to_pstate, verbose=False):
     set_pstate(cluster, from_pstate)
     bench_cpu(cpu)
 
     p.smp_call(cpu, util.timelog, logbuf, LOG_ITERS)
-    psreg = (p.read64(CREG[cluster] + CLUSTER_PSTATE) & ~0x1f01f) | (1<<25) | to_pstate
+    psreg = (
+        (p.read64(CREG[cluster] + CLUSTER_PSTATE) & ~0x1F01F) | (1 << 25) | to_pstate
+    )
     tval = p.call(util.signal_and_write, CREG[cluster] + CLUSTER_PSTATE, psreg)
     p.smp_wait(cpu)
-    
+
     logdata = iface.readmem(logbuf, LOG_ITERS * 16)
     lts, lcyc = None, None
-    
+
     log = []
     for i in range(LOG_ITERS):
-        ts, cyc = struct.unpack("<QQ", logdata  [i*16:i*16+16])
+        ts, cyc = struct.unpack("<QQ", logdata[i * 16 : i * 16 + 16])
         log.append((ts, cyc))
 
     off = 256
-    
+
     ts_0, cyc_0 = log[off]
     ts_e, cyc_e = log[-1]
     f_init = None
@@ -151,11 +164,11 @@ def bench_latency(cluster, cpu, from_pstate, to_pstate, verbose=False):
         if f_end is None and ts > (tval + ts_e) / 2:
             f_end = (cyc_e - cyc) / (ts_e - ts) * tfreq / 1000000
             cnt = dts_sum = 0
-    
-        #if lts is not None:
-            #print(f"{i}: {ts}: {cyc} ({ts-lts}: {cyc-lcyc})")
-        #else:
-            #print(f"{i}: {ts}: {cyc}")
+
+        # if lts is not None:
+        # print(f"{i}: {ts}: {cyc} ({ts-lts}: {cyc-lcyc})")
+        # else:
+        # print(f"{i}: {ts}: {cyc}")
         lts, lcyc = ts, cyc
 
     dts_end = dts_sum / cnt
@@ -165,7 +178,7 @@ def bench_latency(cluster, cpu, from_pstate, to_pstate, verbose=False):
     if verbose:
         print(f"Triggered at {tval}")
 
-    thresh = 2/ (1/f_init + 1/f_end)
+    thresh = 2 / (1 / f_init + 1 / f_end)
 
     for i in range(tidx, LOG_ITERS - window - 1):
         ts0, cyc0 = log[i - window]
@@ -195,6 +208,7 @@ def bench_latency(cluster, cpu, from_pstate, to_pstate, verbose=False):
 
     return (tts - tval) / tfreq * 1000000000, blip / tfreq * 1000000000
 
+
 for cluster, creg in enumerate(CREG):
     cpu = TEST_CPUS[cluster]
 
@@ -210,7 +224,7 @@ for cluster, creg in enumerate(CREG):
         print(f"{pstate}:{freq}MHz", end=" ")
     print()
     print()
-    
+
     print(" To-> |", end="")
     for to_pstate in range(1, MAX_PSTATE[cluster] + 1):
         print(f" {freqs[to_pstate]:7d} |", end="")
@@ -219,9 +233,9 @@ for cluster, creg in enumerate(CREG):
     for to_pstate in range(1, MAX_PSTATE[cluster] + 1):
         print(f"---------+", end="")
     print()
-    
+
     maxblip = 0
-    
+
     for from_pstate in range(1, MAX_PSTATE[cluster] + 1):
         print(f" {freqs[from_pstate]:4d} |", end="")
         for to_pstate in range(1, MAX_PSTATE[cluster] + 1):
@@ -232,13 +246,11 @@ for cluster, creg in enumerate(CREG):
             print(f" {lat:7.0f} |", end="")
             maxblip = max(maxblip, blip)
         print()
-    
+
     print()
     print(f"Maximum execution latency spike: {maxblip:.0f} ns")
     print()
 
 print()
 
-#bench_latency(1, TEST_CPUS[1], 15, 14, True)
-
-
+# bench_latency(1, TEST_CPUS[1], 15, 14, True)

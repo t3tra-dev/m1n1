@@ -2,57 +2,69 @@
 
 import struct
 
-from ..common import *
 from ...utils import *
 from ..asc.base import *
+from ..common import *
 
 
 class AFKEPMessage(Register64):
     TYPE = 63, 48
+
 
 class AFKEP_GetBuf(AFKEPMessage):
     TYPE = 63, 48, Constant(0x89)
     SIZE = 31, 16
     TAG = 15, 0
 
+
 class AFKEP_GetBuf_Ack(AFKEPMessage):
-    TYPE = 63, 48, Constant(0xa1)
+    TYPE = 63, 48, Constant(0xA1)
     DVA = 47, 0
+
 
 class AFKEP_InitRB(AFKEPMessage):
     OFFSET = 47, 32
     SIZE = 31, 16
     TAG = 15, 0
 
+
 class AFKEP_Send(AFKEPMessage):
-    TYPE = 63, 48, Constant(0xa2)
+    TYPE = 63, 48, Constant(0xA2)
     WPTR = 31, 0
+
 
 class AFKEP_Recv(AFKEPMessage):
     TYPE = 63, 48, Constant(0x85)
     WPTR = 31, 0
 
+
 class AFKEP_Init(AFKEPMessage):
     TYPE = 63, 48, Constant(0x80)
 
+
 class AFKEP_Init_Ack(AFKEPMessage):
-    TYPE = 63, 48, Constant(0xa0)
+    TYPE = 63, 48, Constant(0xA0)
+
 
 class AFKEP_Start(AFKEPMessage):
-    TYPE = 63, 48, Constant(0xa3)
+    TYPE = 63, 48, Constant(0xA3)
+
 
 class AFKEP_Start_Ack(AFKEPMessage):
     TYPE = 63, 48, Constant(0x86)
 
+
 class AFKEP_Shutdown(AFKEPMessage):
-    TYPE = 63, 48, Constant(0xc0)
+    TYPE = 63, 48, Constant(0xC0)
+
 
 class AFKEP_Shutdown_Ack(AFKEPMessage):
-    TYPE = 63, 48, Constant(0xc1)
+    TYPE = 63, 48, Constant(0xC1)
 
 
 class AFKError(Exception):
     pass
+
 
 """
 The first three blocks of the ringbuffer is reserved for exchanging size,
@@ -78,6 +90,7 @@ block size at offset +0x0 or +block_size*0, we can calculate the block
 size by dividing by 3.
 """
 
+
 class AFKRingBuf(Reloadable):
     BLOCK_STEP = 0x40
     BLOCK_COUNT = 3
@@ -89,9 +102,9 @@ class AFKRingBuf(Reloadable):
         bs, unk = struct.unpack("<II", self.read_buf(0, 8))
         # calculate block_size
         # bs + self.BLOCK_COUNT * block_size) == size
-        assert((size - bs) % self.BLOCK_COUNT == 0)
+        assert (size - bs) % self.BLOCK_COUNT == 0
         block_size = (size - bs) // self.BLOCK_COUNT
-        assert(block_size % self.BLOCK_STEP == 0)
+        assert block_size % self.BLOCK_STEP == 0
         self.block_size = block_size
         self.bufsize = bs
         self.rptr = 0
@@ -102,14 +115,14 @@ class AFKRingBuf(Reloadable):
 
     def write_buf(self, off, data):
         return self.ep.iface.writemem(self.base + off, data)
-    
+
     def get_rptr(self):
         return struct.unpack("<I", self.read_buf(self.block_size * 1, 4))[0]
-        #return self.ep.asc.p.read32(self.base + self.BLOCK_STEP)
+        # return self.ep.asc.p.read32(self.base + self.BLOCK_STEP)
 
     def get_wptr(self):
         return struct.unpack("<I", self.read_buf(self.block_size * 2, 4))[0]
-        #return self.ep.asc.p.read32(self.base + 2 * self.BLOCK_STEP)
+        # return self.ep.asc.p.read32(self.base + 2 * self.BLOCK_STEP)
 
     def update_rptr(self, rptr):
         self.write_buf(self.block_size * 1, struct.pack("<I", rptr))
@@ -146,7 +159,7 @@ class AFKRingBuf(Reloadable):
         base = self.block_size * 3  # after header (size, rptr, wptr)
         hdr2, data = data[:8], data[8:]
         self.rptr = self.get_rptr()
-        
+
         if self.wptr < self.rptr and self.wptr + 0x10 >= self.rptr:
             raise AFKError("Ring buffer is full")
 
@@ -163,10 +176,13 @@ class AFKRingBuf(Reloadable):
             raise AFKError("Ring buffer is full")
 
         self.write_buf(base + self.wptr + 0x10, data)
-        self.wptr = align_up(self.wptr + 0x10 + len(data), self.block_size) % self.bufsize
+        self.wptr = (
+            align_up(self.wptr + 0x10 + len(data), self.block_size) % self.bufsize
+        )
 
         self.update_wptr(self.wptr)
         return self.wptr
+
 
 class AFKRingBufEndpoint(ASCBaseEndpoint):
     BASE_MESSAGE = AFKEPMessage
@@ -192,12 +208,12 @@ class AFKRingBufEndpoint(ASCBaseEndpoint):
         while self.alive:
             self.asc.work()
 
-    @msg_handler(0xa0, AFKEP_Init_Ack)
+    @msg_handler(0xA0, AFKEP_Init_Ack)
     def Init_Ack(self, msg):
         self.alive = True
         return True
 
-    @msg_handler(0xc1, AFKEP_Shutdown_Ack)
+    @msg_handler(0xC1, AFKEP_Shutdown_Ack)
     def Shutdown_Ack(self, msg):
         self.alive = False
         self.log("Shutdown ACKed")
@@ -218,26 +234,28 @@ class AFKRingBufEndpoint(ASCBaseEndpoint):
             print("WARNING: trying to reset iobuffer!")
 
         self.iobuffer, self.iobuffer_dva = self.asc.ioalloc(size)
-        self.asc.p.write32(self.iobuffer, 0xdeadbeef)
+        self.asc.p.write32(self.iobuffer, 0xDEADBEEF)
         self.send(AFKEP_GetBuf_Ack(DVA=self.iobuffer_dva))
-        self.log(f"Buffer: phys={self.iobuffer:#x} dva={self.iobuffer_dva:#x} size={size:#x}")
+        self.log(
+            f"Buffer: phys={self.iobuffer:#x} dva={self.iobuffer_dva:#x} size={size:#x}"
+        )
         return True
 
-    @msg_handler(0x8a, AFKEP_InitRB)
+    @msg_handler(0x8A, AFKEP_InitRB)
     def InitTX(self, msg):
         self.txq = self.init_rb(msg)
         if self.rxq and self.txq:
             self.start_queues()
         return True
 
-    @msg_handler(0x8b, AFKEP_InitRB)
+    @msg_handler(0x8B, AFKEP_InitRB)
     def InitRX(self, msg):
         self.rxq = self.init_rb(msg)
         if self.rxq and self.txq:
             self.start_queues()
         return True
 
-    @msg_handler(0x8c, AFKEP_InitRB)
+    @msg_handler(0x8C, AFKEP_InitRB)
     def InitUnk(self, msg):
         return True  # no op
 
@@ -268,4 +286,4 @@ class AFKRingBufEndpoint(ASCBaseEndpoint):
 
     def send_ipc(self, data):
         wptr = self.txq.write(data)
-        self.send(AFKEP_Send(WPTR = wptr))
+        self.send(AFKEP_Send(WPTR=wptr))

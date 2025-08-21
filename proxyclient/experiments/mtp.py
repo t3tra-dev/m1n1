@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib, fnmatch
+import fnmatch
+import pathlib
+import sys
 import time
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 import struct
-from m1n1.setup import *
-from m1n1.fw.asc import StandardASC
-from m1n1.hw.dart import DART
-from m1n1.hw.dockchannel import DockChannel
-from m1n1.fw.smc import SMCClient, SMCError
-from m1n1.shell import run_shell
-from m1n1.fw.mtp import *
 
 from construct import *
+from m1n1.fw.asc import StandardASC
+from m1n1.fw.mtp import *
+from m1n1.fw.smc import SMCClient, SMCError
+from m1n1.hw.dart import DART
+from m1n1.hw.dockchannel import DockChannel
+from m1n1.setup import *
+from m1n1.shell import run_shell
 
 smc_addr = u.adt["arm-io/smc"].get_reg(0)[0]
 smc = SMCClient(u, smc_addr)
@@ -43,15 +46,17 @@ mtp.verbose = 3
 mtp.allow_phys = True
 print("pre start")
 
+
 def poll():
     mtp.work()
     mp.work_pending()
+
 
 try:
     mp = MTPProtocol(u, node, mtp, dc, smc)
 
     mp.wait_init("keyboard")
-    #mp.wait_init("multi_touch")
+    # mp.wait_init("multi_touch")
     mp.wait_init("stm")
 
     mtp.stop()
@@ -63,38 +68,38 @@ try:
         mtp.work()
         mp.work_pending()
 
-    #for i in range(256):
-        #if i in (0x40, 0x42):
-            #continue
-        #m = UnkDeviceControlMsg()
-        #m.command = i
-        #for args in (b"", b"\x00", b"\x01", b"\x02",
-                     #b"\x01\x00", b"\x01\x01", b"\x01\x02",
-                     #b"\x00\x01", b"\x00\x02", b"\x00\x00",
-                     #b"\x00\x00\x00",
-                     #b"\x00\x00\x00\x00",
-                     #b"\x00\x00\x00\x00\x00",
-                     #b"\x00\x00\x00\x00\x00\x00",
-                     #b"\x00\x00\x00\x00\x00\x00\x00",
-                     #b"\x00\x00\x00\x00\x00\x00\x00\x00",):
-            #m.args = args
-            #print(f"{m.command:#x} {m.args.hex()}")
-            #mp.comm.device_control(m)
+    # for i in range(256):
+    # if i in (0x40, 0x42):
+    # continue
+    # m = UnkDeviceControlMsg()
+    # m.command = i
+    # for args in (b"", b"\x00", b"\x01", b"\x02",
+    # b"\x01\x00", b"\x01\x01", b"\x01\x02",
+    # b"\x00\x01", b"\x00\x02", b"\x00\x00",
+    # b"\x00\x00\x00",
+    # b"\x00\x00\x00\x00",
+    # b"\x00\x00\x00\x00\x00",
+    # b"\x00\x00\x00\x00\x00\x00",
+    # b"\x00\x00\x00\x00\x00\x00\x00",
+    # b"\x00\x00\x00\x00\x00\x00\x00\x00",):
+    # m.args = args
+    # print(f"{m.command:#x} {m.args.hex()}")
+    # mp.comm.device_control(m)
 
-    #mon.poll()
-    #mtp.stop()
-    #mon.poll()
-    #mtp.start()
+    # mon.poll()
+    # mtp.stop()
+    # mon.poll()
+    # mtp.start()
 
-    #mon.poll()
-    #mtp.stop(1)
+    # mon.poll()
+    # mtp.stop(1)
     ##reset(1)
     ##p.dapf_init_all()
 
-    #mtp.boot()
+    # mtp.boot()
 
     run_shell(locals(), poll_func=poll)
 
 finally:
-    #mtp.stop()
+    # mtp.stop()
     p.reboot()

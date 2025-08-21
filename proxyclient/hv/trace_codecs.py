@@ -1,26 +1,31 @@
 # SPDX-License-Identifier: MIT
 
-from m1n1.utils import RegMap
-from m1n1.trace.i2c import I2CTracer, I2CRegMapTracer
 from m1n1.hw.codecs import *
+from m1n1.trace.i2c import I2CRegMapTracer, I2CTracer
+from m1n1.utils import RegMap
 
 hv.p.hv_set_time_stealing(0, 1)
+
 
 class SN012776Tracer(I2CRegMapTracer):
     REGMAP = SN012776Regs
     ADDRESSING = (1, 1)
 
+
 class TAS5770Tracer(I2CRegMapTracer):
     REGMAP = TAS5770Regs
     ADDRESSING = (1, 1)
+
 
 class CS42L84Tracer(I2CRegMapTracer):
     REGMAP = CS42L84Regs
     ADDRESSING = (0, 2)
 
+
 class SSM3515Tracer(I2CRegMapTracer):
     REGMAP = SSM3515Regs
     ADDRESSING = (0, 1)
+
 
 i2c_tracers = {}
 
@@ -32,7 +37,7 @@ for node in hv.adt["/arm-io"]:
     i2c_tracers[n] = bus = I2CTracer(hv, f"/arm-io/{node.name}")
 
     for devnode in node:
-        if "compatible" not in devnode._properties: # thanks Apple
+        if "compatible" not in devnode._properties:  # thanks Apple
             continue
 
         dcls = {
@@ -42,9 +47,6 @@ for node in hv.adt["/arm-io"]:
             "audio-control,ssm3515": SSM3515Tracer,
         }.get(devnode.compatible[0], None)
         if dcls:
-            bus.add_device(
-                devnode.reg[0] & 0xff,
-                dcls(name=devnode.name)
-            )
+            bus.add_device(devnode.reg[0] & 0xFF, dcls(name=devnode.name))
 
     bus.start()

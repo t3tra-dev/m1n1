@@ -25,16 +25,22 @@ if not hv.started:
             del hv.adt["cpus"][cpu.name]
 
 if not hv.started or hv.ctx is not None:
-    m = GPIOLogicAnalyzer(u, "arm-io/gpio",
-                        pins={"scl": 0xc9, "sda": 0xc7},
-                        div=1, on_pin_change=True, cpu=3)
+    m = GPIOLogicAnalyzer(
+        u,
+        "arm-io/gpio",
+        pins={"scl": 0xC9, "sda": 0xC7},
+        div=1,
+        on_pin_change=True,
+        cpu=3,
+    )
 
-    m.load_regmap(list(i2c_tracers[1].regmaps.values())[0],
-                  regs={"SMSTA", "XFSTA"})
+    m.load_regmap(list(i2c_tracers[1].regmaps.values())[0], regs={"SMSTA", "XFSTA"})
+
 
 def start_la():
     m.start(1000000, bufsize=0x80000)
     hv.cont()
+
 
 def stop_la():
     m.complete()

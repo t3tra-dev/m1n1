@@ -2,17 +2,19 @@
 import struct
 
 from construct import *
-from m1n1.utils import *
-from m1n1.proxyutils import *
 from m1n1.constructutils import *
-from m1n1.trace.asc import ASCTracer, EP, EPState, msg, msg_log, DIR
-from m1n1.trace.dockchannel import DockChannelTracer
-from m1n1.trace.dart import DARTTracer
 from m1n1.fw.mtp import *
+from m1n1.proxyutils import *
+from m1n1.trace.asc import DIR, EP, ASCTracer, EPState, msg, msg_log
+from m1n1.trace.dart import DARTTracer
+from m1n1.trace.dockchannel import DockChannelTracer
+from m1n1.utils import *
+
 
 class MTPTracer(ASCTracer):
     def handle_msg(self, direction, r0, r1):
         super().handle_msg(direction, r0, r1)
+
 
 mtp_tracer = MTPTracer(hv, "/arm-io/mtp", verbose=1)
 mtp_tracer.start()
@@ -26,9 +28,11 @@ DockChannelTracer = DockChannelTracer._reloadcls()
 
 mon = RegMonitor(hv.u, ascii=True, bufsize=0x400000)
 
+
 class StreamState:
     def __init__(self):
         self.buf = bytes()
+
 
 class MTPStream:
     def __init__(self, tracer, name, state):
@@ -51,13 +55,12 @@ class MTPStream:
                 self.state.buf = buf[1:]
                 return
 
-
             need = 8 + size + 4
             if len(buf) < need:
                 self.state.buf = buf
                 return
 
-            payload = buf[8:8 + size]
+            payload = buf[8 : 8 + size]
             self.packet(mtype, devid, ctr, payload)
             buf = buf[need:]
 
@@ -68,6 +71,7 @@ class MTPStream:
 
     def log(self, msg):
         self.tracer.log(f"{self.name} " + msg)
+
 
 class MTPChannelTracer(DockChannelTracer):
     def init_state(self):
@@ -94,10 +98,10 @@ class MTPChannelTracer(DockChannelTracer):
 
     def init_mon(self):
         pass
-        #if self.state.buf is not None:
-            #addr, size = self.dart.iotranslate(1, self.state.buf, self.state.buf_size)[0]
-            #size = align_up(size, 4)
-            #mon.add(addr, size)
+        # if self.state.buf is not None:
+        # addr, size = self.dart.iotranslate(1, self.state.buf, self.state.buf_size)[0]
+        # size = align_up(size, 4)
+        # mon.add(addr, size)
 
     def poll_ring(self):
         wptr = struct.unpack("<I", self.dart.ioread(1, self.state.buf, 4))[0]
@@ -114,7 +118,7 @@ class MTPChannelTracer(DockChannelTracer):
         self.state.rptr = rptr + size
 
     def packet(self, mcode, devid, ctr, data, dir):
-        #mon.poll()
+        # mon.poll()
         chexdump(data, print_fn=self.log)
 
         if data == b"":
@@ -125,9 +129,9 @@ class MTPChannelTracer(DockChannelTracer):
         elif dir == "<":
             msg = RXMessage.parse(data)
             if devid == 0:
-                if (msg.hdr.flags & 0xc0) == 0x00:
+                if (msg.hdr.flags & 0xC0) == 0x00:
                     msg.msg = NotificationMsg.parse(msg.msg)
-                elif (msg.hdr.flags & 0xc0) == 0x80:
+                elif (msg.hdr.flags & 0xC0) == 0x80:
                     msg.msg = DeviceControlAck.parse(msg.msg)
         else:
             assert False
@@ -147,6 +151,7 @@ class MTPChannelTracer(DockChannelTracer):
             self.init_mon()
 
         self.log(f"{dir} Type {mcode:02x} Dev {devid} #{ctr} {msg!s}")
+
 
 hid_tracer = MTPChannelTracer(hv, "/arm-io/dockchannel-mtp", verbose=3)
 hid_tracer.start(dart_tracer.dart)

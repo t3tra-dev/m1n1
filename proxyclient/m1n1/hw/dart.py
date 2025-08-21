@@ -1,24 +1,32 @@
 # SPDX-License-Identifier: MIT
 
 import struct
-
 from enum import IntEnum
-from ..utils import *
-from ..malloc import Heap
 
+from ..malloc import Heap
+from ..utils import *
 from .dart8020 import DART8020, DART8020Regs
 from .dart8110 import DART8110, DART8110Regs
 
 __all__ = ["DART"]
 
+
 class DART(Reloadable):
     PAGE_BITS = 14
     PAGE_SIZE = 1 << PAGE_BITS
 
-    def __init__(self, iface, regs, util=None, compat="dart,t8020", iova_range=(0x80000000, 0x90000000)):
+    def __init__(
+        self,
+        iface,
+        regs,
+        util=None,
+        compat="dart,t8020",
+        iova_range=(0x80000000, 0x90000000),
+    ):
         self.iface = iface
-        self.iova_allocator = [Heap(iova_range[0], iova_range[1], self.PAGE_SIZE)
-                               for i in range(16)]
+        self.iova_allocator = [
+            Heap(iova_range[0], iova_range[1], self.PAGE_SIZE) for i in range(16)
+        ]
         if compat in ["dart,t8020", "dart,t6000"]:
             self.dart = DART8020(iface, regs, util, compat)
         elif compat in ["dart,t8110"]:
@@ -63,7 +71,7 @@ class DART(Reloadable):
         for addr, size in ranges:
             if addr is None:
                 raise Exception(f"Unmapped page at iova {iova:#x}")
-            self.iface.writemem(addr, data[p:p + size])
+            self.iface.writemem(addr, data[p : p + size])
             p += size
             iova += size
 
@@ -85,7 +93,7 @@ class DART(Reloadable):
     def show_error(self):
         self.dart.show_error()
 
-    def invalidate_streams(self, streams=0xffffffff):
+    def invalidate_streams(self, streams=0xFFFFFFFF):
         self.dart.invalidate_streams(streams)
 
     def invalidate_cache(self):

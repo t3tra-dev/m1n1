@@ -1,61 +1,71 @@
 # SPDX-License-Identifier: MIT
 
 import struct
+
 from construct import *
+
 from ..constructutils import *
 from ..utils import *
 
+
 class HIDDescriptor(ConstructClass):
-    subcon = Struct(
-        "descriptor" / HexDump(GreedyBytes)
-    )
+    subcon = Struct("descriptor" / HexDump(GreedyBytes))
+
 
 class GPIOInit(ConstructClass):
     subcon = Struct(
-        "unk1" / Int16ul,
-        "gpio_id"/ Int16ul,
-        "gpio_name" / PaddedString(32, "ascii")
+        "unk1" / Int16ul, "gpio_id" / Int16ul, "gpio_name" / PaddedString(32, "ascii")
     )
+
 
 class InitBlock(ConstructClass):
     subcon = Struct(
         "type" / Int16ul,
         "length" / Int16ul,
-        "payload" / FixedSized(this.length,
-                   Switch(this.type, {
-                       0: HIDDescriptor,
-                       1: GPIOInit,
-                       2: GreedyBytes, # Unknown 6 bytes terminator
-                       7: GreedyBytes, # Device name
-                   }, default=GreedyBytes))
+        "payload"
+        / FixedSized(
+            this.length,
+            Switch(
+                this.type,
+                {
+                    0: HIDDescriptor,
+                    1: GPIOInit,
+                    2: GreedyBytes,  # Unknown 6 bytes terminator
+                    7: GreedyBytes,  # Device name
+                },
+                default=GreedyBytes,
+            ),
+        ),
     )
+
 
 class InitMsg(ConstructClass):
     subcon = Struct(
-        "msg_type" / Const(0xf0, Int8ul),
+        "msg_type" / Const(0xF0, Int8ul),
         "msg_subtype" / Const(0x01, Int8ul),
         "unk" / Const(0x00, Int8ul),
         "device_id" / Int8ul,
         "device_name" / PaddedString(16, "ascii"),
         "more_packets" / Int16ul,
-        "msg" / RepeatUntil(lambda obj, lst, ctx: lst[-1].type == 2, InitBlock)
+        "msg" / RepeatUntil(lambda obj, lst, ctx: lst[-1].type == 2, InitBlock),
     )
+
 
 class DeviceReadyMsg(ConstructClass):
     subcon = Struct(
-        "msg_type" / Const(0xf1, Int8ul),
-        "device_id" / Int8ul,
-        "unk" / Int16ul
+        "msg_type" / Const(0xF1, Int8ul), "device_id" / Int8ul, "unk" / Int16ul
     )
+
 
 class GPIORequestMsg(ConstructClass):
     subcon = Struct(
-        "msg_type" / Const(0xa0, Int8ul),
+        "msg_type" / Const(0xA0, Int8ul),
         "device_id" / Int8ul,
         "gpio_num" / Int8ul,
         "cmd" / Int16ul,
-        "args" / HexDump(GreedyBytes)
+        "args" / HexDump(GreedyBytes),
     )
+
 
 NotificationMsg = Select(
     DeviceReadyMsg,
@@ -64,17 +74,20 @@ NotificationMsg = Select(
     HexDump(GreedyBytes),
 )
 
+
 class UnkDeviceControlMsg(ConstructClass):
     subcon = Struct(
         "command" / Int8ul,
         "args" / HexDump(GreedyBytes),
     )
 
+
 class DeviceEnableMsg(ConstructClass):
     subcon = Struct(
-        "command" / Const(0xb4, Int8ul),
+        "command" / Const(0xB4, Int8ul),
         "device_id" / Int8ul,
     )
+
 
 class DeviceResetMsg(ConstructClass):
     subcon = Struct(
@@ -84,6 +97,7 @@ class DeviceResetMsg(ConstructClass):
         "state" / Int8ul,
     )
 
+
 class InitBufMsg(ConstructClass):
     subcon = Struct(
         "command" / Const(0x91, Int8ul),
@@ -92,6 +106,7 @@ class InitBufMsg(ConstructClass):
         "buf_addr" / Int64ul,
         "buf_size" / Int32ul,
     )
+
 
 class InitAFEMsg(ConstructClass):
     subcon = Struct(
@@ -103,18 +118,21 @@ class InitAFEMsg(ConstructClass):
         "buf_size" / Int32ul,
     )
 
+
 class UnkMsgC1(ConstructClass):
     subcon = Struct(
-        "command" / Const(0xc1, Int8ul),
+        "command" / Const(0xC1, Int8ul),
         "unk1" / Int8ul,
     )
 
+
 class GPIOAckMsg(ConstructClass):
     subcon = Struct(
-        "command" / Const(0xa1, Int8ul),
+        "command" / Const(0xA1, Int8ul),
         "unk" / Int32ul,
         "msg" / GPIORequestMsg,
     )
+
 
 DeviceControlMsg = Select(
     DeviceEnableMsg,
@@ -122,13 +140,13 @@ DeviceControlMsg = Select(
     InitAFEMsg,
     InitBufMsg,
     UnkMsgC1,
-    UnkDeviceControlMsg
+    UnkDeviceControlMsg,
 )
 
+
 class DeviceControlAck(ConstructClass):
-    subcon = Struct(
-        "command" / Int8ul
-    )
+    subcon = Struct("command" / Int8ul)
+
 
 class MessageHeader(ConstructClass):
     subcon = Struct(
@@ -137,25 +155,34 @@ class MessageHeader(ConstructClass):
         "retcode" / Int32ul,
     )
 
+
 class TXMessage(ConstructClass):
     subcon = Struct(
         "hdr" / MessageHeader,
-        "msg" / FixedSized(this.hdr.length,
-                           Switch(this.hdr.flags, {
-                               0x40: HexDump(GreedyBytes),
-                               0x80: DeviceControlMsg,
-                               0x81: Int8ul,
-                           }))
+        "msg"
+        / FixedSized(
+            this.hdr.length,
+            Switch(
+                this.hdr.flags,
+                {
+                    0x40: HexDump(GreedyBytes),
+                    0x80: DeviceControlMsg,
+                    0x81: Int8ul,
+                },
+            ),
+        ),
     )
 
     def __init__(self):
         self.hdr = MessageHeader()
+
 
 class RXMessage(ConstructClass):
     subcon = Struct(
         "hdr" / MessageHeader,
         "msg" / FixedSized(this.hdr.length, HexDump(GreedyBytes)),
     )
+
 
 class MTPInterface:
     def __init__(self, proto, iface):
@@ -166,7 +193,7 @@ class MTPInterface:
         self.gpios = {}
 
     def send(self, msg):
-        self.proto.send(self.iface, self.tx_seq & 0xff, msg)
+        self.proto.send(self.iface, self.tx_seq & 0xFF, msg)
         self.tx_seq += 1
 
     def get_report(self, idx):
@@ -198,7 +225,7 @@ class MTPInterface:
     def packet(self, pkt):
         msg = RXMessage.parse(pkt)
         mtype = msg.hdr.flags
-        #self.log(f"FL:{msg.hdr.flag    s:04x} unk:{msg.hdr.unk:08x}")
+        # self.log(f"FL:{msg.hdr.flag    s:04x} unk:{msg.hdr.unk:08x}")
         if mtype == 0x00:
             self.report(msg.msg)
         elif mtype == 0x80:
@@ -221,7 +248,6 @@ class MTPCommInterface(MTPInterface):
         self.last_cmd = None
         self.gpios = {}
 
-
     def device_control(self, dcmsg):
         while self.last_cmd is not None:
             self.proto.work()
@@ -230,7 +256,7 @@ class MTPCommInterface(MTPInterface):
         msg.hdr.length = len(dcmsg.build())
         msg.hdr.retcode = 0
         msg.msg = dcmsg
-        #self.log(f"Send device control {dcmsg}")
+        # self.log(f"Send device control {dcmsg}")
         self.last_cmd = dcmsg.command
         self.send(msg.build())
         while self.last_cmd is not None:
@@ -257,8 +283,10 @@ class MTPCommInterface(MTPInterface):
                     self.log(hexdump(iface.descriptor))
                 elif isinstance(blk.payload, GPIOInit):
                     self.log(f"GPIO Init: {blk.payload}")
-                    prop = getattr(self.proto.node[msg.device_name],
-                                   f"function-{blk.payload.gpio_name}".replace("-", "_"))
+                    prop = getattr(
+                        self.proto.node[msg.device_name],
+                        f"function-{blk.payload.gpio_name}".replace("-", "_"),
+                    )
                     key = struct.pack(">I", prop.args[0]).decode("ascii")
                     val = prop.args[1]
                     self.log(f"GPIO key: {key}")
@@ -307,8 +335,10 @@ class MTPCommInterface(MTPInterface):
         rmsg.state = state
         self.device_control(rmsg)
 
+
 class MTPHIDInterface(MTPInterface):
     pass
+
 
 class MTPMultitouchInterface(MTPHIDInterface):
     NAME = "multi-touch"
@@ -316,22 +346,27 @@ class MTPMultitouchInterface(MTPHIDInterface):
     def initialize(self):
         super().initialize()
 
-        #data = open("afe.bin", "rb").read()
-        #self.proto.comm.init_afe(self.iface, data)
-        #self.proto.comm.device_reset(self.iface, 1, 0)
-        #self.proto.comm.device_reset(self.iface, 1, 2)
+        # data = open("afe.bin", "rb").read()
+        # self.proto.comm.init_afe(self.iface, data)
+        # self.proto.comm.device_reset(self.iface, 1, 0)
+        # self.proto.comm.device_reset(self.iface, 1, 2)
+
 
 class MTPKeyboardInterface(MTPHIDInterface):
     NAME = "keyboard"
 
+
 class MTPSTMInterface(MTPHIDInterface):
     NAME = "stm"
+
 
 class MTPActuatorInterface(MTPHIDInterface):
     NAME = "actuator"
 
+
 class MTPTPAccelInterface(MTPHIDInterface):
     NAME = "tp_accel"
+
 
 class MTPProtocol:
     INTERFACES = [
@@ -372,15 +407,15 @@ class MTPProtocol:
     def checksum(self, d):
         assert len(d) % 4 == 0
         c = len(d) // 4
-        return 0xffffffff - sum(struct.unpack(f"<{c}I", d)) & 0xffffffff
+        return 0xFFFFFFFF - sum(struct.unpack(f"<{c}I", d)) & 0xFFFFFFFF
 
     def read_pkt(self):
         self.mtp.work_pending()
         hdr = self.dockchannel.read(8)
         hlen, mtype, size, ctr, devid, pad = struct.unpack("<BBHBBH", hdr)
-        #self.log(f"<L:{hlen} T:{mtype:02x} S:{size:04x} D:{devid}")
+        # self.log(f"<L:{hlen} T:{mtype:02x} S:{size:04x} D:{devid}")
         assert hlen == 8
-        #assert mtype == 0x12
+        # assert mtype == 0x12
         data = self.dockchannel.read(size)
         checksum = struct.unpack("<I", self.dockchannel.read(4))[0]
         expect = self.checksum(hdr + data)

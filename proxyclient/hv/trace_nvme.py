@@ -1,15 +1,14 @@
 # SPDX-License-Identifier: MIT
 
 from construct import *
-from construct.core import Int16ul, Int32ul, Int64ul, Int8ul
-
+from construct.core import Int8ul, Int16ul, Int32ul, Int64ul
 from m1n1.hv import TraceMode
-from m1n1.utils import *
 from m1n1.trace import ADTDevTracer
-from m1n1.trace.asc import ASCRegs
-from m1n1.trace.asc import ASCTracer
+from m1n1.trace.asc import ASCRegs, ASCTracer
+from m1n1.utils import *
 
 ASCTracer = ASCTracer._reloadcls()
+
 
 class NVMERegs(RegMap):
     APPLE_NVMMU_NUM = 0x28100, Register32

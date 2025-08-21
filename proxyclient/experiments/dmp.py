@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib, time
+import pathlib
+import sys
+import time
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 from m1n1.setup import *
+
 from m1n1 import asm
 
 REPETITIONS = 64
@@ -18,10 +22,12 @@ PNRG_a = 75
 PRNG_m = 31337
 rnd_idx = 8
 
+
 def prng(x):
     return (PNRG_a * x) % PRNG_m
 
-SIZE_DATA_ARRAY = (PRNG_m * L2_LINE_SIZE)
+
+SIZE_DATA_ARRAY = PRNG_m * L2_LINE_SIZE
 
 data_buf_addr = u.memalign(PAGE_SIZE, SIZE_DATA_ARRAY)
 p.memset64(data_buf_addr, 0x5555555555555555, SIZE_DATA_ARRAY)
@@ -31,7 +37,8 @@ p.memset64(aop_addr, 0x5555555555555555, PAGE_SIZE)
 freq = u.mrs(CNTFRQ_EL0)
 code = u.malloc(0x1000)
 
-util = asm.ARMAsm("""
+util = asm.ARMAsm(
+    """
 test:
     dc civac, x0
     dc civac, x1
@@ -84,7 +91,9 @@ test:
     lsl x5, x5, #32
     orr x0, x0, x5
     ret
-""", code)
+""",
+    code,
+)
 for i in util.disassemble():
     print(i)
 iface.writemem(code, util.data)
@@ -94,16 +103,19 @@ p.ic_ivau(code, len(util.data))
 # Set higher cpufreq pstate on all clusters
 p.cpufreq_init()
 p.smp_start_secondaries()
-p.smp_set_wfe_mode(True);
+p.smp_set_wfe_mode(True)
+
 
 def cpu_call(cpu, x, *args):
     return p.smp_call_sync(cpu, x | REGION_RX_EL1, *args)
+
 
 def init_core(cpu):
     p.mmu_init_secondary(cpu)
 
     def mrs(x):
         return u.mrs(x, call=lambda x, *args: cpu_call(cpu, x, *args))
+
     def msr(x, v):
         u.msr(x, v, call=lambda x, *args: cpu_call(cpu, x, *args))
 
@@ -115,19 +127,20 @@ def init_core(cpu):
 
     # Enable PMU
     v = mrs(PMCR0_EL1)
-    v |= 1 | (1<<30)
+    v |= 1 | (1 << 30)
     msr(PMCR0_EL1, v)
-    msr(PMCR1_EL1, 0xffffffffffffffff)
+    msr(PMCR1_EL1, 0xFFFFFFFFFFFFFFFF)
 
     # Enable TBI
     v = mrs(TCR_EL1)
-    v |= (1 << 37)
+    v |= 1 << 37
     msr(TCR_EL1, v)
 
     # Enable user cache ops
     v = mrs(SCTLR_EL1)
-    v |= (1 << 26)
+    v |= 1 << 26
     msr(SCTLR_EL1, v)
+
 
 init_core(TEST_ECORE)
 init_core(TEST_PCORE)
@@ -136,6 +149,7 @@ init_core(TEST_PCORE)
 v = u.mrs(EHID4_EL1)
 v &= ~(1 << 11)
 u.msr(EHID4_EL1, v)
+
 
 def test_cpu(cpu, mask):
     global rnd_idx
@@ -151,9 +165,15 @@ def test_cpu(cpu, mask):
         p.dc_civac(aop_addr, L2_LINE_SIZE)
         # p.dc_civac(data_buf_addr, SIZE_DATA_ARRAY)
 
-        elapsed = p.smp_call_sync_el0(cpu, util.test | REGION_RWX_EL0, aop_addr | REGION_RWX_EL0, test_addr | REGION_RWX_EL0, 7 << 60)
+        elapsed = p.smp_call_sync_el0(
+            cpu,
+            util.test | REGION_RWX_EL0,
+            aop_addr | REGION_RWX_EL0,
+            test_addr | REGION_RWX_EL0,
+            7 << 60,
+        )
         time_aop = elapsed >> 32
-        time_ptr = elapsed & 0xffffffff
+        time_ptr = elapsed & 0xFFFFFFFF
         total_aop += time_aop
         total_ptr += time_ptr
 
@@ -163,9 +183,9 @@ def test_cpu(cpu, mask):
 
 
 print("ECore plain:", test_cpu(TEST_ECORE, 0))
-print("ECore mask: ", test_cpu(TEST_ECORE, 0xaaaaaaaa00000000))
+print("ECore mask: ", test_cpu(TEST_ECORE, 0xAAAAAAAA00000000))
 print("PCore plain:", test_cpu(TEST_PCORE, 0))
-print("PCore mask: ", test_cpu(TEST_PCORE, 0xaaaaaaaa00000000))
+print("PCore mask: ", test_cpu(TEST_PCORE, 0xAAAAAAAA00000000))
 
 for reg in (
     # "HID0_EL1",
@@ -198,17 +218,16 @@ for reg in (
             ("HID4_EL1", 4),
             ("HID11_EL1", 30),
             ("HID21_EL1", 40),
-            ):
+        ):
             continue
 
-        bit = (1 << i)
+        bit = 1 << i
         print(f"Test {reg} bit {i}:", end=" ")
 
         u.msr(reg, hid ^ bit, call=lambda x, *args: cpu_call(cpu, x, *args))
 
         tval = test_cpu(cpu, 0)[1]
-        control = test_cpu(cpu, 0xaaaaaaaa00000000)[1]
-
+        control = test_cpu(cpu, 0xAAAAAAAA00000000)[1]
 
         if tval < (0.75 * control):
             print(f"DMP active {tval} {control}")
@@ -216,4 +235,3 @@ for reg in (
             print(f"DMP INACTIVE {tval} {control}")
 
     u.msr(reg, hid, call=lambda x, *args: cpu_call(cpu, x, *args))
-

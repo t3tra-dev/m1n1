@@ -1,93 +1,98 @@
 import struct
-from construct import *
 
-from m1n1.utils import irange
-from m1n1.hw.dart import DART
-from m1n1.utils import chexdump
-from m1n1.proxyutils import RegMonitor
+from construct import *
 from m1n1.constructutils import *
 from m1n1.hv.types import MMIOTraceFlags
-
+from m1n1.hw.dart import DART
+from m1n1.proxyutils import RegMonitor
 from m1n1.trace.pcie import *
+from m1n1.utils import chexdump, irange
 
 PCIeDevTracer = PCIeDevTracer._reloadcls()
 
 mon = RegMonitor(hv.u)
 
+
 class WLANCfgSpace(PCICfgSpace):
-    PM_CSR              = 0x4c, Register32
+    PM_CSR = 0x4C, Register32
 
-    MSI_CAP             = 0x58, Register16
-    MSI_CTRL            = 0x5a, Register16
-    MSI_ADDR_L          = 0x5c, Register32
-    MSI_ADDR_H          = 0x60, Register32
-    MSI_DATA            = 0x64, Register32
+    MSI_CAP = 0x58, Register16
+    MSI_CTRL = 0x5A, Register16
+    MSI_ADDR_L = 0x5C, Register32
+    MSI_ADDR_H = 0x60, Register32
+    MSI_DATA = 0x64, Register32
 
-    BAR0_WIN_1000       = 0x70, Register32
-    BAR0_WIN_4000       = 0x74, Register32
-    BAR0_WIN_5000       = 0x78, Register32
-    BAR0_WINDOW         = 0x80, Register32
-    BAR1_WINDOW         = 0x84, Register32
-    SPROM_CONTROL       = 0x88, Register32
-    CFG_SUBSYS_CONTROL  = 0x8c, Register32
-    INTSTATUS           = 0x90, Register32
-    INTMASK             = 0x94, Register32
-    BACKPLANE_ADDR      = 0x98, Register32
-    BACKPLANE_DATA      = 0x9c, Register32
-    CLK_CTL_ST          = 0xa8, Register32
+    BAR0_WIN_1000 = 0x70, Register32
+    BAR0_WIN_4000 = 0x74, Register32
+    BAR0_WIN_5000 = 0x78, Register32
+    BAR0_WINDOW = 0x80, Register32
+    BAR1_WINDOW = 0x84, Register32
+    SPROM_CONTROL = 0x88, Register32
+    CFG_SUBSYS_CONTROL = 0x8C, Register32
+    INTSTATUS = 0x90, Register32
+    INTMASK = 0x94, Register32
+    BACKPLANE_ADDR = 0x98, Register32
+    BACKPLANE_DATA = 0x9C, Register32
+    CLK_CTL_ST = 0xA8, Register32
 
-    CFG_DEVICE_CONTROL  = 0xb4, Register32
-    LINK_STATUS_CTRL    = 0xbc, Register32
+    CFG_DEVICE_CONTROL = 0xB4, Register32
+    LINK_STATUS_CTRL = 0xBC, Register32
+
 
 class WLANSRAMEnd(RegMap):
-    PAD                 = 0x00, Register32
-    SHARED_BASE         = 0x04, Register32
+    PAD = 0x00, Register32
+    SHARED_BASE = 0x04, Register32
+
 
 class WLANSRAMShared(RegMap):
-    FLAGS               = 0, Register32
-    CONSOLE_ADDR        = 20, Register32
-    FWID                = 28, Register32
-    MAX_RXBUFPOST       = 34, Register16
-    RX_DATAOFFSET       = 36, Register32
-    HTOD_MB_DATA_ADDR   = 40, Register32
-    DTOH_MB_DATA_ADDR   = 44, Register32
-    RING_INFO_ADDR      = 48, Register32
-    DMA_SCRATCH_LEN     = 52, Register32
-    DMA_SCRATCH_ADDR    = 56, Register64
-    HOST_SCB_ADDR       = 64, Register64
-    HOST_SCB_SIZE       = 72, Register32
-    BUZZ_DBG_PTR        = 76, Register32
-    FLAGS2              = 80, Register32
-    HOST_CAP            = 84, Register32
-    HOST_TRAP_ADDR      = 88, Register64
+    FLAGS = 0, Register32
+    CONSOLE_ADDR = 20, Register32
+    FWID = 28, Register32
+    MAX_RXBUFPOST = 34, Register16
+    RX_DATAOFFSET = 36, Register32
+    HTOD_MB_DATA_ADDR = 40, Register32
+    DTOH_MB_DATA_ADDR = 44, Register32
+    RING_INFO_ADDR = 48, Register32
+    DMA_SCRATCH_LEN = 52, Register32
+    DMA_SCRATCH_ADDR = 56, Register64
+    HOST_SCB_ADDR = 64, Register64
+    HOST_SCB_SIZE = 72, Register32
+    BUZZ_DBG_PTR = 76, Register32
+    FLAGS2 = 80, Register32
+    HOST_CAP = 84, Register32
+    HOST_TRAP_ADDR = 88, Register64
     DEVICE_FATAL_LOGBUF_START = 96, Register32
-    HOFFLOAD_ADDR       = 100, Register64
-    FLAGS3              = 108, Register32
-    HOST_CAP2           = 112, Register32
-    HOST_CAP3           = 116, Register32
-    ETD_ADDR            = 120, Register32
+    HOFFLOAD_ADDR = 100, Register64
+    FLAGS3 = 108, Register32
+    HOST_CAP2 = 112, Register32
+    HOST_CAP3 = 116, Register32
+    ETD_ADDR = 120, Register32
     DEVICE_TXPOST_EXT_TAGS_BITMASK = 124, Register32
 
+
 class WLANSRAMRingInfo(RegMap):
-    RINGMEM             = 0x00, Register32
-    H2D_W_IDX_PTR       = 0x04, Register32
-    H2D_R_IDX_PTR       = 0x08, Register32
-    D2H_W_IDX_PTR       = 0x0c, Register32
-    D2H_R_IDX_PTR       = 0x10, Register32
-    H2D_W_IDX_HOSTADDR  = 0x14, Register64
-    H2D_R_IDX_HOSTADDR  = 0x1c, Register64
-    D2H_W_IDX_HOSTADDR  = 0x24, Register64
-    D2H_R_IDX_HOSTADDR  = 0x2c, Register64
-    MAX_FLOWRINGS       = 0x34, Register32
+    RINGMEM = 0x00, Register32
+    H2D_W_IDX_PTR = 0x04, Register32
+    H2D_R_IDX_PTR = 0x08, Register32
+    D2H_W_IDX_PTR = 0x0C, Register32
+    D2H_R_IDX_PTR = 0x10, Register32
+    H2D_W_IDX_HOSTADDR = 0x14, Register64
+    H2D_R_IDX_HOSTADDR = 0x1C, Register64
+    D2H_W_IDX_HOSTADDR = 0x24, Register64
+    D2H_R_IDX_HOSTADDR = 0x2C, Register64
+    MAX_FLOWRINGS = 0x34, Register32
     MAX_SUBMISSIONRINGS = 0x38, Register32
-    MAX_COMPLETIONRINGS = 0x3c, Register32
+    MAX_COMPLETIONRINGS = 0x3C, Register32
+
 
 COMMON_RING_CNT = 5
 
+
 class WLANSRAMRingMem(RegMap):
-    MAX_ITEM            = irange(0x04, COMMON_RING_CNT, 0x10), Register16
-    LEN_ITEMS           = irange(0x06, COMMON_RING_CNT, 0x10), Register16
-    BASE_ADDR           = irange(0x08, COMMON_RING_CNT, 0x10), Register32
+    MAX_ITEM = irange(0x04, COMMON_RING_CNT, 0x10), Register16
+    LEN_ITEMS = irange(0x06, COMMON_RING_CNT, 0x10), Register16
+    BASE_ADDR = irange(0x08, COMMON_RING_CNT, 0x10), Register32
+
 
 class MsgHeader(ConstructClass):
     subcon = Struct(
@@ -98,11 +103,13 @@ class MsgHeader(ConstructClass):
         "request_id" / Int32ul,
     )
 
+
 class ComplHeader(ConstructClass):
     subcon = Struct(
         "status" / Int16ul,
         "ring_id" / Int16ul,
     )
+
 
 class IOCtlPtrReq(ConstructClass):
     subcon = Struct(
@@ -114,6 +121,7 @@ class IOCtlPtrReq(ConstructClass):
         "host_input_buf_addr" / Int64ul,
     )
 
+
 class IOCtlResp(ConstructClass):
     subcon = Struct(
         "compl" / ComplHeader,
@@ -122,10 +130,10 @@ class IOCtlResp(ConstructClass):
         "cmd" / Int32ul,
     )
 
+
 class H2DMailboxData(ConstructClass):
-    subcon = Struct(
-        "data" / Int32ul
-    )
+    subcon = Struct("data" / Int32ul)
+
 
 class D2HMailboxData(ConstructClass):
     subcon = Struct(
@@ -133,20 +141,27 @@ class D2HMailboxData(ConstructClass):
         "data" / Int32ul,
     )
 
+
 class RingMessage(ConstructClass):
     subcon = Struct(
         "hdr" / MsgHeader,
-        "payload" / Switch(this.hdr.msg_type, {
-            0x09: IOCtlPtrReq,
-            0x0c: IOCtlResp,
-            0x23: H2DMailboxData,
-            0x24: D2HMailboxData,
-
-        }, default=HexDump(GreedyBytes))
+        "payload"
+        / Switch(
+            this.hdr.msg_type,
+            {
+                0x09: IOCtlPtrReq,
+                0x0C: IOCtlResp,
+                0x23: H2DMailboxData,
+                0x24: D2HMailboxData,
+            },
+            default=HexDump(GreedyBytes),
+        ),
     )
+
 
 class RingState:
     pass
+
 
 class WLANRingTracer(PCIeDevTracer):
     def __init__(self, wlan, info):
@@ -167,10 +182,16 @@ class WLANRingTracer(PCIeDevTracer):
         self.count = info.count
 
         if self.RX:
-            d2h_paddr = self.wlan.iotranslate(self.wlan.state.d2h_w_idx_ha + 4 * self.PTR_IDX, 4)[0][0]
+            d2h_paddr = self.wlan.iotranslate(
+                self.wlan.state.d2h_w_idx_ha + 4 * self.PTR_IDX, 4
+            )[0][0]
             assert d2h_paddr is not None
-            self.hv.add_tracer(irange(d2h_paddr, 4), self.wlan.ident, TraceMode.SYNC,
-                               read=self.d2h_w_idx_readhook)
+            self.hv.add_tracer(
+                irange(d2h_paddr, 4),
+                self.wlan.ident,
+                TraceMode.SYNC,
+                read=self.d2h_w_idx_readhook,
+            )
 
     def d2h_w_idx_readhook(self, evt):
         self.log("W idx read")
@@ -197,11 +218,12 @@ class WLANRingTracer(PCIeDevTracer):
         self.log(pkt)
         if pkt.hdr.msg_type == 0x09:
             self.wlan.ioctlptr_req(pkt)
-        if pkt.hdr.msg_type == 0x0c:
+        if pkt.hdr.msg_type == 0x0C:
             self.wlan.ioctlresp(pkt)
 
     def log(self, msg):
         self.wlan.log(f"[{self.NAME}]{msg!s}")
+
 
 class WLANControlSubmitRingTracer(WLANRingTracer):
     NAME = "CTLSubmit"
@@ -209,11 +231,13 @@ class WLANControlSubmitRingTracer(WLANRingTracer):
     RX = False
     ITEM_SIZE = 0x28
 
+
 class WLANControlCompleteRingTracer(WLANRingTracer):
     NAME = "CTLCompl"
     PTR_IDX = 0
     RX = True
     ITEM_SIZE = 0x18
+
 
 class RingInfo:
     def __init__(self):
@@ -222,7 +246,12 @@ class RingInfo:
         self.base_addr = None
 
     def ready(self):
-        return self.count is not None and self.item_size is not None and self.base_addr is not None
+        return (
+            self.count is not None
+            and self.item_size is not None
+            and self.base_addr is not None
+        )
+
 
 class REG_IOCTL(Register32):
     CLK = 0
@@ -231,6 +260,7 @@ class REG_IOCTL(Register32):
     PME_EN = 14
     BIST_EN = 15
 
+
 class REG_IOST(Register32):
     CORE_SPECIFIC = 11, 0
     DMA64 = 12
@@ -238,8 +268,10 @@ class REG_IOST(Register32):
     BIST_ERROR = 14
     BIST_DONE = 15
 
+
 class REG_RESET_CTL(Register32):
     RESET = 0
+
 
 class REG_CLK_CTL(Register32):
     FORCEALP = 0
@@ -255,6 +287,7 @@ class REG_CLK_CTL(Register32):
     BP_ON_ALP = 18
     BP_ON_HT = 19
     EXTRESST = 26, 24
+
 
 class REG_PWR_CTL(Register32):
     DMN0 = 0
@@ -275,10 +308,12 @@ class REG_PWR_CTL(Register32):
     BT_STATUS = 21, 20
     DMN_ID = 31, 28
 
+
 class WLANAgentRegs(RegMap):
-    IOCTL               = 0x408, REG_IOCTL
-    IOST                = 0x500, REG_IOST
-    RESET_CTL           = 0x800, REG_RESET_CTL
+    IOCTL = 0x408, REG_IOCTL
+    IOST = 0x500, REG_IOST
+    RESET_CTL = 0x800, REG_RESET_CTL
+
 
 class WLANDevice(Reloadable):
     LENGTH = 0x1000
@@ -356,9 +391,10 @@ class WLANDevice(Reloadable):
     def log(self, msg, show_cpu=True):
         self.wlan.log(f"[{self.name}] {msg}", show_cpu=show_cpu)
 
+
 class WLANBackplane(Reloadable):
     SRAM_BASE = 0x740000
-    SRAM_SIZE = 0x1f9000
+    SRAM_SIZE = 0x1F9000
 
     DEVICES = []
 
@@ -393,42 +429,45 @@ class WLANBackplane(Reloadable):
         dev.evt_rw(evt, base)
         regmap = dev.regmap
 
+
 class WLANChipCommonRegs(RegMap):
     pass
 
+
 class WLANPCIE2Regs(RegMap):
-    INTMASK                 = 0x24, Register32
-    MAILBOXINT              = 0x48, Register32
-    MAILBOXMASK             = 0x4c, Register32
-    CONFIGADDR              = 0x120, Register32
-    CONFIGDATA              = 0x124, Register32
-    H2D_MAILBOX_0           = 0x140, Register32
-    H2D_MAILBOX_1           = 0x144, Register32
+    INTMASK = 0x24, Register32
+    MAILBOXINT = 0x48, Register32
+    MAILBOXMASK = 0x4C, Register32
+    CONFIGADDR = 0x120, Register32
+    CONFIGDATA = 0x124, Register32
+    H2D_MAILBOX_0 = 0x140, Register32
+    H2D_MAILBOX_1 = 0x144, Register32
 
-    CLK_CTL                 = 0x1e0, REG_CLK_CTL
-    PWR_CTL                 = 0x1e8, REG_PWR_CTL
+    CLK_CTL = 0x1E0, REG_CLK_CTL
+    PWR_CTL = 0x1E8, REG_PWR_CTL
 
-    HMAP_WINDOW_BASE_L      = 0x540, Register32
-    HMAP_WINDOW_BASE_H      = 0x544, Register32
-    HMAP_WINDOW_SIZE        = 0x548, Register32
-    HMAP_VIOLATION_ADDR_L   = 0x5c0, Register32
-    HMAP_VIOLATION_ADDR_H   = 0x5c4, Register32
-    HMAP_VIOLATION_INFO     = 0x5c8, Register32
-    HMAP_WINDOW_CONFIG      = 0x5d0, Register32
+    HMAP_WINDOW_BASE_L = 0x540, Register32
+    HMAP_WINDOW_BASE_H = 0x544, Register32
+    HMAP_WINDOW_SIZE = 0x548, Register32
+    HMAP_VIOLATION_ADDR_L = 0x5C0, Register32
+    HMAP_VIOLATION_ADDR_H = 0x5C4, Register32
+    HMAP_VIOLATION_INFO = 0x5C8, Register32
+    HMAP_WINDOW_CONFIG = 0x5D0, Register32
 
-    HMAP_WINDOW_BASE_L_64   = 0x580, Register32
-    HMAP_WINDOW_BASE_H_64   = 0x584, Register32
-    HMAP_WINDOW_SIZE        = 0x588, Register32
-    HMAP_VIOLATION_ADDR_L_64= 0x600, Register32
-    HMAP_VIOLATION_ADDR_H_64= 0x604, Register32
-    HMAP_VIOLATION_INFO_64  = 0x608, Register32
-    HMAP_WINDOW_CONFIG_64   = 0x610, Register32
+    HMAP_WINDOW_BASE_L_64 = 0x580, Register32
+    HMAP_WINDOW_BASE_H_64 = 0x584, Register32
+    HMAP_WINDOW_SIZE = 0x588, Register32
+    HMAP_VIOLATION_ADDR_L_64 = 0x600, Register32
+    HMAP_VIOLATION_ADDR_H_64 = 0x604, Register32
+    HMAP_VIOLATION_INFO_64 = 0x608, Register32
+    HMAP_WINDOW_CONFIG_64 = 0x610, Register32
 
-    H2D_MAILBOX_0_64        = 0xa20, Register32
-    H2D_MAILBOX_1_64        = 0xa24, Register32
-    INTMASK_64              = 0xc14, Register32
-    MAILBOXINT_64           = 0xc30, Register32
-    MAILBOXMASK_64          = 0xc34, Register32
+    H2D_MAILBOX_0_64 = 0xA20, Register32
+    H2D_MAILBOX_1_64 = 0xA24, Register32
+    INTMASK_64 = 0xC14, Register32
+    MAILBOXINT_64 = 0xC30, Register32
+    MAILBOXMASK_64 = 0xC34, Register32
+
 
 class WLANPCIE2Core(WLANDevice):
     REGMAP = WLANPCIE2Regs
@@ -446,40 +485,44 @@ class WLANPCIE2Core(WLANDevice):
 
     def w_MAILBOXMASK_64(self, val):
         pass
-        #self.hv.run_shell()
+        # self.hv.run_shell()
+
 
 class WLANGCIRegs(RegMap):
     OTPDATA = irange(0x1000, 0x400, 2), Register16
+
 
 class WLANGCICore(WLANDevice):
     LENGTH = 0x2000
     REGMAP = WLANGCIRegs
 
+
 class WLANBackplane4388(WLANBackplane):
     SRAM_BASE = 0x200000
-    SRAM_SIZE = 0x2e0000
+    SRAM_SIZE = 0x2E0000
 
     DEVICES = [
-        (0x800, 75,  0x18000000, 0x18100000, "cc",      None),
-        (0x83c, 74,  0x18001000, 0x18101000, "pcie2",   WLANPCIE2Core),
-        (0x847, 11,  0x18020000, 0x18120000, "arm_ca7", None),
-        (0x812, 87,  0x18021000, 0x18121000, "80211_0", None),
-        (0x812, 87,  0x18022000, 0x18122000, "80211_1", None),
-        (0x812, 87,  0x18023000, 0x18123000, "80211_2", None),
-        (0x850, 1,   0x00000000, 0x1812c000, "850?",    None),
-        (0x849, 12,  0x18024000, 0x18124000, "sys_mem", None),
-        (0x857, 8,   0x00000000, 0x18108000, "857?",    None),
-        (0x840, 27,  0x18010000, 0x00000000, "gci",     WLANGCICore),
-        (0x827, 43,  0x18012000, 0x00000000, "pmu",     None),
-        (0x135, 0,   0x00000000, 0x18106000, "apb_0",  None),
-        (0x135, 0,   0x00000000, 0x18107000, "apb_1",  None),
-        (0x135, 0,   0x00000000, 0x18132000, "apb_2",  None),
-        (0x31,  0,   0x00000000, 0x18131000, "31_0?",   None),
-        (0x31,  0,   0x00000000, 0x1810b000, "31_1?",   None),
-        (0x31,  0,   0x00000000, 0x1810c000, "31_2?",   None),
-        (0xfff, 0,   0x1801f000, 0x18104000, "fff_0?",  None),
-        (0xfff, 0,   0x1801f000, 0x1812f000, "fff_1?",  None),
+        (0x800, 75, 0x18000000, 0x18100000, "cc", None),
+        (0x83C, 74, 0x18001000, 0x18101000, "pcie2", WLANPCIE2Core),
+        (0x847, 11, 0x18020000, 0x18120000, "arm_ca7", None),
+        (0x812, 87, 0x18021000, 0x18121000, "80211_0", None),
+        (0x812, 87, 0x18022000, 0x18122000, "80211_1", None),
+        (0x812, 87, 0x18023000, 0x18123000, "80211_2", None),
+        (0x850, 1, 0x00000000, 0x1812C000, "850?", None),
+        (0x849, 12, 0x18024000, 0x18124000, "sys_mem", None),
+        (0x857, 8, 0x00000000, 0x18108000, "857?", None),
+        (0x840, 27, 0x18010000, 0x00000000, "gci", WLANGCICore),
+        (0x827, 43, 0x18012000, 0x00000000, "pmu", None),
+        (0x135, 0, 0x00000000, 0x18106000, "apb_0", None),
+        (0x135, 0, 0x00000000, 0x18107000, "apb_1", None),
+        (0x135, 0, 0x00000000, 0x18132000, "apb_2", None),
+        (0x31, 0, 0x00000000, 0x18131000, "31_0?", None),
+        (0x31, 0, 0x00000000, 0x1810B000, "31_1?", None),
+        (0x31, 0, 0x00000000, 0x1810C000, "31_2?", None),
+        (0xFFF, 0, 0x1801F000, 0x18104000, "fff_0?", None),
+        (0xFFF, 0, 0x1801F000, 0x1812F000, "fff_1?", None),
     ]
+
 
 class WLANTracer(PCIeDevTracer):
     DEFAULT_MODE = TraceMode.SYNC
@@ -489,10 +532,10 @@ class WLANTracer(PCIeDevTracer):
 
     RINGS = [
         WLANControlSubmitRingTracer,
-        None, # RXPost
+        None,  # RXPost
         WLANControlCompleteRingTracer,
-        None, # TX complete
-        None, # RX complete
+        None,  # TX complete
+        None,  # RX complete
     ]
 
     CMDS = {
@@ -542,7 +585,7 @@ class WLANTracer(PCIeDevTracer):
         t = "w" if evt.flags.WRITE else "r"
 
         evt = evt.copy()
-        evt.addr = off & 0xfff
+        evt.addr = off & 0xFFF
 
         if 0x0000 <= off < 0x1000:
             self.bp.evt_rw(evt, self.cfg.cached.BAR0_WINDOW.val)
@@ -562,7 +605,7 @@ class WLANTracer(PCIeDevTracer):
     def config_dart(self):
         # Ugly...
         if self.dart_dev is None:
-            for i in range (16):
+            for i in range(16):
                 ttbr = self.dart.dart.regs.TTBR[i].reg
                 if ttbr.VALID:
                     self.log(f"DART device: {i}")
@@ -580,7 +623,7 @@ class WLANTracer(PCIeDevTracer):
         return self.dart.iotranslate(self.dart_dev, addr, size)
 
     def r_SHARED_BASE(self, base):
-        if base.value & 0xffff == (base.value >> 16) ^ 0xffff:
+        if base.value & 0xFFFF == (base.value >> 16) ^ 0xFFFF:
             return
 
         self.state.shared_base = base.value
@@ -653,7 +696,7 @@ class WLANTracer(PCIeDevTracer):
         data = self.ioread(pkt.payload.host_input_buf_addr, pkt.payload.input_buf_len)
         cmd = self.CMDS.get(pkt.payload.cmd, "unk")
         self.log(f"IOCTL request ({cmd}):")
-        chexdump(data, print_fn = self.log)
+        chexdump(data, print_fn=self.log)
         self.state.ioctls[pkt.payload.trans_id] = pkt
 
     def ioctlresp(self, pkt):
@@ -665,7 +708,7 @@ class WLANTracer(PCIeDevTracer):
         data = self.ioread(req.payload.host_input_buf_addr, req.payload.output_buf_len)
         cmd = self.CMDS.get(pkt.payload.cmd, "unk")
         self.log(f"IOCTL response ({cmd}):")
-        chexdump(data, print_fn = self.log)
+        chexdump(data, print_fn=self.log)
         del self.state.ioctls[pkt.payload.trans_id]
 
     def trace_bar(self, idx, start, size):
@@ -689,16 +732,21 @@ class WLANTracer(PCIeDevTracer):
         if self.dart is None:
             self.dart = DART.from_adt(self.u, self.dart_path)
 
-        self.trace_regmap(self.state.tcm_base + self.bp.SRAM_BASE + self.bp.SRAM_SIZE - 8, 8,
-                          WLANSRAMEnd, name="sram")
+        self.trace_regmap(
+            self.state.tcm_base + self.bp.SRAM_BASE + self.bp.SRAM_SIZE - 8,
+            8,
+            WLANSRAMEnd,
+            name="sram",
+        )
 
     def update_bar0_tracers(self):
         if self.state.bar0_base is None:
             return
 
         zone = irange(self.state.bar0_base, self.state.bar0_size)
-        self.hv.add_tracer(zone, self.ident, self.DEFAULT_MODE, self.bar0_rw,
-                           self.bar0_rw)
+        self.hv.add_tracer(
+            zone, self.ident, self.DEFAULT_MODE, self.bar0_rw, self.bar0_rw
+        )
 
     def update_shared(self):
         base = self.state.shared_base
@@ -714,26 +762,37 @@ class WLANTracer(PCIeDevTracer):
             self.state.ring_info_base = self.shared.RING_INFO_ADDR.val
 
         if self.state.ring_mem_base is None:
-            self.ring_info = WLANSRAMRingInfo(self.hv.u,
-                                            self.state.tcm_base + self.state.ring_info_base)
+            self.ring_info = WLANSRAMRingInfo(
+                self.hv.u, self.state.tcm_base + self.state.ring_info_base
+            )
             self.log("Reading ring info")
             self.ring_info.dump_regs()
 
             self.state.ring_mem_base = self.ring_info.RINGMEM.val
 
-        self.trace_regmap(self.state.tcm_base + base, 0x100,
-                          WLANSRAMShared, name="shared")
+        self.trace_regmap(
+            self.state.tcm_base + base, 0x100, WLANSRAMShared, name="shared"
+        )
 
-        self.trace_regmap(self.state.tcm_base + self.state.ring_info_base, 0x40,
-                          WLANSRAMRingInfo, name="ringinfo")
+        self.trace_regmap(
+            self.state.tcm_base + self.state.ring_info_base,
+            0x40,
+            WLANSRAMRingInfo,
+            name="ringinfo",
+        )
 
-        self.ring_mem = WLANSRAMRingMem(self.hv.u,
-                                        self.state.tcm_base + self.state.ring_mem_base)
+        self.ring_mem = WLANSRAMRingMem(
+            self.hv.u, self.state.tcm_base + self.state.ring_mem_base
+        )
         self.log("Reading ring mem")
         self.ring_mem.dump_regs()
 
-        self.trace_regmap(self.state.tcm_base + self.state.ring_mem_base,
-                          COMMON_RING_CNT * 0x10, WLANSRAMRingMem, name="ringmem")
+        self.trace_regmap(
+            self.state.tcm_base + self.state.ring_mem_base,
+            COMMON_RING_CNT * 0x10,
+            WLANSRAMRingMem,
+            name="ringmem",
+        )
 
     def start(self):
         super().start()
@@ -743,9 +802,9 @@ class WLANTracer(PCIeDevTracer):
         for i in range(len(self.RINGS)):
             self.update_ring(i)
 
+
 devno = 2 if hv.xnu_mode else 1
 
-wlan_tracer = WLANTracer(hv, "/arm-io/apcie",
-                         devno, 0, 0, "/arm-io/dart-apcie0")
+wlan_tracer = WLANTracer(hv, "/arm-io/apcie", devno, 0, 0, "/arm-io/dart-apcie0")
 
 wlan_tracer.start()

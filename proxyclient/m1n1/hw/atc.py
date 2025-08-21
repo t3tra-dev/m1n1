@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 
 from enum import IntEnum
+
 from m1n1.utils import *
 
 
@@ -282,6 +283,7 @@ class R_AUSPMA_RX_SHM_TJ_RXA_VREF_CTRL22(Register32):
 class R_AUSPMA_RX_TOP_TJ_CFG_RX_TXMODE(Register32):
     RX_TXMODE = 0
 
+
 class R_ACIOPHY_LANE_DP_CFG_BLK_TX_DP_CTRL0(Register32):
     DP_PMA_BYTECLK_RESET = 0
     DP_MAC_DIV20_CLK_SEL = 1
@@ -333,7 +335,7 @@ class AtcPhyRegs(RegMap):
     LPDPTX_AUX_CFG_BLK = irange(0x50000, 0x1000 // 4, 4), Register32
     LPDPTX_AUX_CFG_BLK_AUX_CTRL = 0x50000, Register32
     LPDPTX_AUX_CFG_BLK_AUX_LDO_CTRL = 0x50008, Register32
-    LPDPTX_AUX_CFG_BLK_AUX_MARGIN = 0x5000c, Register32
+    LPDPTX_AUX_CFG_BLK_AUX_MARGIN = 0x5000C, Register32
     LPDPTX_AUX_SHM_CFG_BLK_AUX_CTRL_REG0 = 0x50204, Register32
     LPDPTX_AUX_SHM_CFG_BLK_AUX_CTRL_REG1 = 0x50208, Register32
 

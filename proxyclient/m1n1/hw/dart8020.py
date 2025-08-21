@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: MIT
 
 import struct
-
 from enum import IntEnum
-from ..utils import *
+
 from ..malloc import Heap
+from ..utils import *
 
 __all__ = ["DART8020Regs", "DART8020"]
+
 
 class R_ERROR(Register32):
     FLAG = 31
@@ -22,24 +23,29 @@ class R_ERROR(Register32):
     NO_PMD = 1
     NO_TTBR = 0
 
+
 class R_STREAM_COMMAND(Register32):
     INVALIDATE = 20
     BUSY = 2
+
 
 class R_TCR(Register32):
     BYPASS_DAPF = 12
     BYPASS_DART = 8
     TRANSLATE_ENABLE = 7
 
+
 class R_TTBR(Register32):
     VALID = 31
     ADDR = 30, 0
+
 
 class R_REMAP(Register32):
     MAP3 = 31, 24
     MAP2 = 23, 16
     MAP1 = 15, 8
     MAP0 = 7, 0
+
 
 class PTE_T8020(Register64):
     SP_START = 63, 52
@@ -48,6 +54,7 @@ class PTE_T8020(Register64):
     SP_PROT_DIS = 1
     VALID = 0
 
+
 class PTE_T6000(Register64):
     SP_START = 63, 52
     SP_END = 51, 40
@@ -55,44 +62,49 @@ class PTE_T6000(Register64):
     SP_PROT_DIS = 1
     VALID = 0
 
+
 class R_CONFIG(Register32):
     LOCK = 15
+
 
 class R_DAPF_LOCK(Register32):
     LOCK = 0
 
+
 class DART8020Regs(RegMap):
-    STREAM_COMMAND  = 0x20, R_STREAM_COMMAND
-    STREAM_SELECT   = 0x34, Register32
-    ERROR           = 0x40, R_ERROR
-    ERROR_ADDR_LO   = 0x50, Register32
-    ERROR_ADDR_HI   = 0x54, Register32
-    CONFIG          = 0x60, R_CONFIG
-    REMAP           = irange(0x80, 4, 4), R_REMAP
+    STREAM_COMMAND = 0x20, R_STREAM_COMMAND
+    STREAM_SELECT = 0x34, Register32
+    ERROR = 0x40, R_ERROR
+    ERROR_ADDR_LO = 0x50, Register32
+    ERROR_ADDR_HI = 0x54, Register32
+    CONFIG = 0x60, R_CONFIG
+    REMAP = irange(0x80, 4, 4), R_REMAP
 
-    DAPF_LOCK       = 0xf0, R_DAPF_LOCK
-    UNK1            = 0xf8, Register32
-    ENABLED_STREAMS = 0xfc, Register32
+    DAPF_LOCK = 0xF0, R_DAPF_LOCK
+    UNK1 = 0xF8, Register32
+    ENABLED_STREAMS = 0xFC, Register32
 
-    TCR             = irange(0x100, 16, 4), R_TCR
-    TTBR            = (irange(0x200, 16, 16), range(0, 16, 4)), R_TTBR
+    TCR = irange(0x100, 16, 4), R_TCR
+    TTBR = (irange(0x200, 16, 16), range(0, 16, 4)), R_TTBR
+
 
 PTE_TYPES = {
     "dart,t8020": PTE_T8020,
     "dart,t6000": PTE_T6000,
 }
 
+
 class DART8020(Reloadable):
     PAGE_BITS = 14
     PAGE_SIZE = 1 << PAGE_BITS
 
-    L0_SIZE = 4 # TTBR count
+    L0_SIZE = 4  # TTBR count
     L0_OFF = 36
     L1_OFF = 25
     L2_OFF = 14
 
     IDX_BITS = 11
-    Lx_SIZE = (1 << IDX_BITS)
+    Lx_SIZE = 1 << IDX_BITS
     IDX_MASK = Lx_SIZE - 1
 
     def __init__(self, iface, regs, util=None, compat="dart,t8020"):
@@ -115,7 +127,7 @@ class DART8020(Reloadable):
             return
 
         if not (self.enabled_streams & (1 << stream)):
-            self.enabled_streams |= (1 << stream)
+            self.enabled_streams |= 1 << stream
             self.regs.ENABLED_STREAMS.val |= self.enabled_streams
 
         tcr = self.regs.TCR[stream].reg
@@ -158,7 +170,8 @@ class DART8020(Reloadable):
                 l2addr = self.u.memalign(self.PAGE_SIZE, self.PAGE_SIZE)
                 self.pt_cache[l2addr] = [0] * self.Lx_SIZE
                 l1pte = self.ptecls(
-                    OFFSET=l2addr >> self.PAGE_BITS, VALID=1, SP_PROT_DIS=1)
+                    OFFSET=l2addr >> self.PAGE_BITS, VALID=1, SP_PROT_DIS=1
+                )
                 l1[l1idx] = l1pte.value
                 dirty.add(ttbr.ADDR << 12)
             else:
@@ -168,8 +181,12 @@ class DART8020(Reloadable):
             cached, l2 = self.get_pt(l2addr)
             l2idx = (page >> self.L2_OFF) & self.IDX_MASK
             self.pt_cache[l2addr][l2idx] = self.ptecls(
-                SP_START=0, SP_END=0xfff,
-                OFFSET=paddr >> self.PAGE_BITS, VALID=1, SP_PROT_DIS=1).value
+                SP_START=0,
+                SP_END=0xFFF,
+                OFFSET=paddr >> self.PAGE_BITS,
+                VALID=1,
+                SP_PROT_DIS=1,
+            ).value
 
         for page in dirty:
             self.flush_pt(page)
@@ -186,7 +203,7 @@ class DART8020(Reloadable):
         if tcr.BYPASS_DART or not tcr.TRANSLATE_ENABLE:
             raise Exception(f"Unknown DART mode {tcr}")
 
-        start = start & 0xffffffff
+        start = start & 0xFFFFFFFF
 
         start_page = align_down(start, self.PAGE_SIZE)
         start_off = start - start_page
@@ -231,8 +248,9 @@ class DART8020(Reloadable):
                 ranges.append((page, self.PAGE_SIZE))
                 continue
             laddr, lsize = ranges[-1]
-            if ((page is None and laddr is None) or
-                (page is not None and laddr == (page - lsize))):
+            if (page is None and laddr is None) or (
+                page is not None and laddr == (page - lsize)
+            ):
                 ranges[-1] = laddr, lsize + self.PAGE_SIZE
             else:
                 ranges.append((page, self.PAGE_SIZE))
@@ -240,8 +258,10 @@ class DART8020(Reloadable):
         ranges[-1] = (ranges[-1][0], ranges[-1][1] - self.PAGE_SIZE + end_size)
 
         if start_off:
-            ranges[0] = (ranges[0][0] + start_off if ranges[0][0] else None,
-                         ranges[0][1] - start_off)
+            ranges[0] = (
+                ranges[0][0] + start_off if ranges[0][0] else None,
+                ranges[0][1] - start_off,
+            )
 
         return ranges
 
@@ -250,13 +270,18 @@ class DART8020(Reloadable):
         if addr not in self.pt_cache or uncached:
             cached = False
             self.pt_cache[addr] = list(
-                struct.unpack(f"<{self.Lx_SIZE}Q", self.iface.readmem(addr, self.PAGE_SIZE)))
+                struct.unpack(
+                    f"<{self.Lx_SIZE}Q", self.iface.readmem(addr, self.PAGE_SIZE)
+                )
+            )
 
         return cached, self.pt_cache[addr]
 
     def flush_pt(self, addr):
         assert addr in self.pt_cache
-        self.iface.writemem(addr, struct.pack(f"<{self.Lx_SIZE}Q", *self.pt_cache[addr]))
+        self.iface.writemem(
+            addr, struct.pack(f"<{self.Lx_SIZE}Q", *self.pt_cache[addr])
+        )
 
     def initialize(self):
         for i in range(15):
@@ -265,9 +290,9 @@ class DART8020(Reloadable):
 
         for i in range(16):
             for j in range(4):
-                self.regs.TTBR[i, j].reg = R_TTBR(VALID = 0)
+                self.regs.TTBR[i, j].reg = R_TTBR(VALID=0)
 
-        self.regs.ERROR.val = 0xffffffff
+        self.regs.ERROR.val = 0xFFFFFFFF
         self.regs.UNK1.val = 0
         self.regs.ENABLED_STREAMS.val = 0
         self.enabled_streams = 0
@@ -277,10 +302,12 @@ class DART8020(Reloadable):
     def show_error(self):
         if self.regs.ERROR.reg.FLAG:
             print(f"ERROR: {self.regs.ERROR.reg!s}")
-            print(f"ADDR: {self.regs.ERROR_ADDR_HI.val:#x}:{self.regs.ERROR_ADDR_LO.val:#x}")
-            self.regs.ERROR.val = 0xffffffff
+            print(
+                f"ADDR: {self.regs.ERROR_ADDR_HI.val:#x}:{self.regs.ERROR_ADDR_LO.val:#x}"
+            )
+            self.regs.ERROR.val = 0xFFFFFFFF
 
-    def invalidate_streams(self, streams=0xffffffff):
+    def invalidate_streams(self, streams=0xFFFFFFFF):
         self.regs.STREAM_SELECT.val = streams
         self.regs.STREAM_COMMAND.val = R_STREAM_COMMAND(INVALIDATE=1)
         while self.regs.STREAM_COMMAND.reg.BUSY:
@@ -294,13 +321,27 @@ class DART8020(Reloadable):
         def print_block(base, pte, start, last):
             pgcount = last - start
             pte.OFFSET -= pgcount
-            print("    page (%4d): %08x ... %08x -> %016x [%d%d]" % (
-                    start, base + start*0x4000, base + (start+1)*0x4000,
-                    pte.OFFSET << self.PAGE_BITS, pte.SP_PROT_DIS, pte.VALID))
+            print(
+                "    page (%4d): %08x ... %08x -> %016x [%d%d]"
+                % (
+                    start,
+                    base + start * 0x4000,
+                    base + (start + 1) * 0x4000,
+                    pte.OFFSET << self.PAGE_BITS,
+                    pte.SP_PROT_DIS,
+                    pte.VALID,
+                )
+            )
             if start < last:
-                print("     ==> (%4d):          ... %08x -> %016x size: %08x" % (
-                    last, base + (last+1)*0x4000,
-                    (pte.OFFSET + pgcount - 1) << self.PAGE_BITS, pgcount << self.PAGE_BITS))
+                print(
+                    "     ==> (%4d):          ... %08x -> %016x size: %08x"
+                    % (
+                        last,
+                        base + (last + 1) * 0x4000,
+                        (pte.OFFSET + pgcount - 1) << self.PAGE_BITS,
+                        pgcount << self.PAGE_BITS,
+                    )
+                )
 
         cached, tbl = self.get_pt(l1_addr)
 
@@ -346,10 +387,18 @@ class DART8020(Reloadable):
 
             unmapped = False
 
-            print("  table (%d): %08x ... %08x -> %016x [%d%d]" % (
-                i, base + i*0x2000000, base + (i+1)*0x2000000,
-                pte.OFFSET << self.PAGE_BITS, pte.SP_PROT_DIS, pte.VALID))
-            self.dump_table2(base + i*0x2000000, pte.OFFSET << self.PAGE_BITS)
+            print(
+                "  table (%d): %08x ... %08x -> %016x [%d%d]"
+                % (
+                    i,
+                    base + i * 0x2000000,
+                    base + (i + 1) * 0x2000000,
+                    pte.OFFSET << self.PAGE_BITS,
+                    pte.SP_PROT_DIS,
+                    pte.VALID,
+                )
+            )
+            self.dump_table2(base + i * 0x2000000, pte.OFFSET << self.PAGE_BITS)
 
     def dump_ttbr(self, idx, ttbr):
         if not ttbr.VALID:

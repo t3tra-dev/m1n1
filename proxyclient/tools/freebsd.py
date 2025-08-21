@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
+
 import serial
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
-import argparse, pathlib
+import argparse
+import pathlib
 
 # FreeBSD's setup differs from Linux's in the following primary ways:
 #
@@ -17,13 +21,13 @@ import argparse, pathlib
 #    are not specified.  Otherwise, we'll load them from memory if they are
 #    provided.
 #
-parser = argparse.ArgumentParser(description='(FreeBSD) kernel loader for m1n1')
-parser.add_argument('u_boot', type=pathlib.Path, help="load u-boot before linux")
-parser.add_argument('dtb', type=pathlib.Path)
-parser.add_argument('-l', '--loader', type=pathlib.Path)
-parser.add_argument('-k', '--kernel', type=pathlib.Path)
-parser.add_argument('-b', '--bootargs', type=str, metavar='"boot arguments"')
-parser.add_argument('-t', '--tty', type=str)
+parser = argparse.ArgumentParser(description="(FreeBSD) kernel loader for m1n1")
+parser.add_argument("u_boot", type=pathlib.Path, help="load u-boot before linux")
+parser.add_argument("dtb", type=pathlib.Path)
+parser.add_argument("-l", "--loader", type=pathlib.Path)
+parser.add_argument("-k", "--kernel", type=pathlib.Path)
+parser.add_argument("-b", "--bootargs", type=str, metavar='"boot arguments"')
+parser.add_argument("-t", "--tty", type=str)
 args = parser.parse_args()
 
 from m1n1.setup import *
@@ -64,7 +68,7 @@ loader_base = u.memalign(2 * 1024 * 1024, loader_size)
 
 print("loader_base: 0x%x" % loader_base)
 
-assert not (loader_base & 0xffff)
+assert not (loader_base & 0xFFFF)
 
 if kernel is not None:
     kernel_base = u.memalign(65536, kernel_size)
@@ -74,14 +78,23 @@ if kernel is not None:
 
 uboot = bytearray(args.u_boot.read_bytes())
 uboot_size = len(uboot)
-uboot_addr = u.memalign(2*1024*1024, len(uboot))
+uboot_addr = u.memalign(2 * 1024 * 1024, len(uboot))
 print("Loading u-boot to 0x%x..." % uboot_addr)
 
 bootenv_start = uboot.find(b"bootcmd=run distro_bootcmd")
 bootenv_len = uboot[bootenv_start:].find(b"\x00\x00")
-bootenv_old = uboot[bootenv_start:bootenv_start+bootenv_len]
+bootenv_old = uboot[bootenv_start : bootenv_start + bootenv_len]
 bootenv = str(bootenv_old, "ascii").split("\x00")
-bootenv = list(filter(lambda x: not (x.startswith("baudrate") or (x.startswith("boot_") and not x.startswith("boot_efi_")) or x.startswith("distro_bootcmd")), bootenv))
+bootenv = list(
+    filter(
+        lambda x: not (
+            x.startswith("baudrate")
+            or (x.startswith("boot_") and not x.startswith("boot_efi_"))
+            or x.startswith("distro_bootcmd")
+        ),
+        bootenv,
+    )
+)
 
 if loader is not None:
     # dtb_addr not used here, the prepared fdt's at a different location.  If
@@ -91,7 +104,7 @@ else:
     bootcmd = "distro_bootcmd=devnum=0; run nvme_boot"
 
 if tty_dev is not None:
-	bootenv.append("baudrate=%d" % tty_dev.baudrate)
+    bootenv.append("baudrate=%d" % tty_dev.baudrate)
 bootenv.append(bootcmd)
 if args.bootargs is not None:
     bootenv.append("bootargs=" + args.bootargs)
@@ -101,7 +114,7 @@ bootenv_new = bootenv_new.ljust(len(bootenv_old), b"\x00")
 
 if len(bootenv_new) > len(bootenv_old):
     raise Exception("New bootenv cannot be larger than original bootenv")
-uboot[bootenv_start:bootenv_start+bootenv_len] = bootenv_new
+uboot[bootenv_start : bootenv_start + bootenv_len] = bootenv_new
 
 u.compressed_writemem(uboot_addr, uboot, True)
 p.dc_cvau(uboot_addr, uboot_size)
@@ -118,7 +131,10 @@ if p.kboot_prepare_dt(dtb_addr):
 iface.dev.timeout = 40
 
 if loader is not None:
-    print("Loading %d bytes to 0x%x..0x%x..." % (loader_size, loader_base, loader_base + loader_size))
+    print(
+        "Loading %d bytes to 0x%x..0x%x..."
+        % (loader_size, loader_base, loader_base + loader_size)
+    )
     iface.writemem(loader_base, loader, True)
 
     p.dc_cvau(loader_base, loader_size)
@@ -127,7 +143,7 @@ if loader is not None:
 print("Ready to boot")
 
 daif = u.mrs(DAIF)
-daif = 0xc0
+daif = 0xC0
 u.msr(DAIF, daif)
 print("DAIF: %x" % daif)
 

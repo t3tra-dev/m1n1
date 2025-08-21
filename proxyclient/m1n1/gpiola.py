@@ -1,13 +1,27 @@
 # SPDX-License-Identifier: MIT
-import os, sys, struct, time
+import os
+import struct
+import sys
+import time
 
-from .utils import *
 from . import asm
 from .proxy import REGION_RX_EL1
 from .sysreg import *
+from .utils import *
+
 
 class GPIOLogicAnalyzer(Reloadable):
-    def __init__(self, u, node=None, pins={}, regs={}, div=1, cpu=1, on_pin_change=True, on_reg_change=True):
+    def __init__(
+        self,
+        u,
+        node=None,
+        pins={},
+        regs={},
+        div=1,
+        cpu=1,
+        on_pin_change=True,
+        on_reg_change=True,
+    ):
         self.u = u
         self.p = u.proxy
         self.iface = u.iface
@@ -16,7 +30,7 @@ class GPIOLogicAnalyzer(Reloadable):
         if node is not None:
             self.base = u.adt[node].get_reg(0)[0]
         else:
-            on_pin_change=False
+            on_pin_change = False
         self.node = node
         self.pins = pins
         self.regs = regs
@@ -135,7 +149,7 @@ class GPIOLogicAnalyzer(Reloadable):
             sub x0, x2, x10
             ret
         """
-        
+
         code = asm.ARMAsm(text, self.cbuf)
         self.iface.writemem(self.cbuf, code.data)
         self.p.dc_cvau(self.cbuf, len(code.data))
@@ -143,8 +157,15 @@ class GPIOLogicAnalyzer(Reloadable):
 
         self.p.write32(self.dbuf, 0)
 
-        self.p.smp_call(self.cpu, code.trace | REGION_RX_EL1, ticks, self.div, self.dbuf, bufsize - (8 + 4 * len(self.regs)))
-    
+        self.p.smp_call(
+            self.cpu,
+            code.trace | REGION_RX_EL1,
+            ticks,
+            self.div,
+            self.dbuf,
+            bufsize - (8 + 4 * len(self.regs)),
+        )
+
     def complete(self):
         self.p.write32(self.dbuf, 1)
         wrote = self.p.smp_wait(self.cpu)
@@ -152,33 +173,36 @@ class GPIOLogicAnalyzer(Reloadable):
         data = self.iface.readmem(self.dbuf + 4, wrote)
         self.u.free(self.dbuf)
         self.dbuf = None
-        
+
         stride = 2 + len(self.regs)
-        
-        #chexdump(data)
-        
-        self.data = [struct.unpack("<" + "I" * stride,
-                                   data[i:i + 4 * stride])
-                     for i in range(0, len(data), 4 * stride)]
+
+        # chexdump(data)
+
+        self.data = [
+            struct.unpack("<" + "I" * stride, data[i : i + 4 * stride])
+            for i in range(0, len(data), 4 * stride)
+        ]
 
     def vcd(self):
         off = self.data[0][0]
-        if False: #len(self.data) > 1:
-            off2 = max(0, ((self.data[1][0] - off) & 0xffffffff) - 5000)
+        if False:  # len(self.data) > 1:
+            off2 = max(0, ((self.data[1][0] - off) & 0xFFFFFFFF) - 5000)
         else:
             off2 = 0
-        
-        #print(off, off2)
-        
+
+        # print(off, off2)
+
         vcd = []
-        vcd.append("""
+        vcd.append(
+            """
 $timescale 1ns $end
 $scope module gpio $end
-""")
+"""
+        )
         sym = 0
         keys = []
         rkeys = []
-                                           
+
         for name in self.pins:
             keys.append(f"s{sym}")
             vcd.append(f"$var wire 1 s{sym} {name} $end\n")
@@ -196,25 +220,31 @@ $scope module gpio $end
                         width = fdef[0] - fdef[1] + 1
                     else:
                         width = 1
-                    vcd.append(f"$var reg {width} s{sym} {name}.{fname} [{width-1}:0] $end\n")
+                    vcd.append(
+                        f"$var reg {width} s{sym} {name}.{fname} [{width-1}:0] $end\n"
+                    )
                     subkeys[fname] = (width, f"s{sym}")
                     sym += 1
             else:
                 rkeys.append((f"s{sym}", None, None))
                 sym += 1
-        vcd.append("""
+        vcd.append(
+            """
 $enddefinitions $end
 $dumpvars
-""")
+"""
+        )
 
         for v in self.data:
             ts = v[0]
             val = v[1]
             regs = v[2:]
-            ts = ((ts - off) & 0xffffffff) - off2
+            ts = ((ts - off) & 0xFFFFFFFF) - off2
             ns = max(0, 1000000000 * ts // self.tfreq)
             vcd.append(f"#{ns}\n")
-            vcd.append("\n".join(f"{(val>>i) & 1}{k}" for i, k in enumerate(keys)) + "\n")
+            vcd.append(
+                "\n".join(f"{(val>>i) & 1}{k}" for i, k in enumerate(keys)) + "\n"
+            )
             for (key, rcls, subkeys), v in zip(rkeys, regs):
                 vcd.append(f"b{v:032b} {key}\n")
                 if rcls:
@@ -222,18 +252,22 @@ $dumpvars
                     for field, (width, key) in subkeys.items():
                         v = getattr(rval, field)
                         vcd.append(f"b{v:0{width}b} {key}\n")
-                    
 
-        ns += ns//10
-        vcd.append(f"#{ns}\n" + "\n".join(f"{(val>>i) & 1}{k}" for i, k in enumerate(keys)) + "\n")
- 
+        ns += ns // 10
+        vcd.append(
+            f"#{ns}\n"
+            + "\n".join(f"{(val>>i) & 1}{k}" for i, k in enumerate(keys))
+            + "\n"
+        )
+
         return "".join(vcd)
-    
+
     def show(self):
         with open("/tmp/dump.vcd", "w") as fd:
             fd.write(self.vcd())
-        
-        gtkw = ("""
+
+        gtkw = (
+            """
 [dumpfile] "/tmp/dump.vcd"
 [timestart] 0
 [size] 3063 1418
@@ -244,9 +278,12 @@ $dumpvars
 [sst_expanded] 1
 [sst_vpaned_height] 421
 @23
-""" +
-        "\n".join("gpio." + k for k in self.pins) + "\n" + 
-        "\n".join("gpio." + k + "[31:0]" for k in self.regs) + "\n")
+"""
+            + "\n".join("gpio." + k for k in self.pins)
+            + "\n"
+            + "\n".join("gpio." + k + "[31:0]" for k in self.regs)
+            + "\n"
+        )
 
         with open("/tmp/dump.gtkw", "w") as fd:
             fd.write(gtkw)

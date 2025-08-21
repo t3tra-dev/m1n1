@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib, fnmatch, signal
+import fnmatch
+import pathlib
+import signal
+import sys
 import time
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 import struct
+
+from m1n1.fw.smc import SMCClient, SMCError
 from m1n1.setup import *
 from m1n1.shell import run_shell
-from m1n1.fw.smc import SMCClient, SMCError
 
 smc_addr = u.adt["arm-io/smc"].get_reg(0)[0]
 smc = SMCClient(u, smc_addr)
@@ -31,9 +36,9 @@ fmts = {
     "D?CR": "#x",
     "AC-I": "#x",
     "D?FC": "#x",
-    "D?VM": lambda v: (v>>8) | ((v&0xff)<<8),
-    "D?VX": lambda v: (v>>8) | ((v&0xff)<<8),
-    "B0RM": lambda v: (v>>8) | ((v&0xff)<<8),
+    "D?VM": lambda v: (v >> 8) | ((v & 0xFF) << 8),
+    "D?VX": lambda v: (v >> 8) | ((v & 0xFF) << 8),
+    "B0RM": lambda v: (v >> 8) | ((v & 0xFF) << 8),
     ##"BAAC": lambda v: ((v&0xff00)>>8) | ((v&0xff)<<8),
 }
 
@@ -43,10 +48,10 @@ for i in range(count):
     k = smcep.get_key_by_index(i)
     if not any(fnmatch.fnmatchcase(k, i) for i in pats):
         continue
-    if any(fnmatch.fnmatchcase('-' + k, i) for i in pats):
+    if any(fnmatch.fnmatchcase("-" + k, i) for i in pats):
         continue
     length, type, flags = smcep.get_key_info(k)
-    if type in ("ch8*",  "{jst"):
+    if type in ("ch8*", "{jst"):
         continue
     if flags & 0x80:
         try:
@@ -58,8 +63,10 @@ for i in range(count):
             if fmt is None:
                 fmt = lambda a: ("%.02f" % a) if isinstance(a, float) else a
             elif isinstance(fmt, str):
+
                 def ff(fmt):
                     return lambda a: f"{a:{fmt}}"
+
                 fmt = ff(fmt)
             vals[k] = val, length, type, fmt
             print(f"#{i}: {k} = ({type}, {flags:#x}) {fmt(val)}")
@@ -69,6 +76,7 @@ for i in range(count):
         print(f"#{i}: {k} = ({type}, {flags:#x}) <not available>")
 
 slots = {}
+
 
 def poll():
     global cnt
@@ -96,9 +104,11 @@ def poll():
     cnt += 1
     time.sleep(1)
 
+
 def handle_sigint(signal=None, stack=None):
     global doshell
     doshell = True
+
 
 signal.signal(signal.SIGINT, handle_sigint)
 
@@ -112,4 +122,3 @@ try:
             doshell = False
 finally:
     smc.stop()
-    

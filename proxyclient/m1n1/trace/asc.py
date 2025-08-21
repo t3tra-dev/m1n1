@@ -2,14 +2,17 @@
 
 import struct
 from enum import IntEnum
+
 from ..hv import TraceMode
+from ..hw.asc import *
 from ..utils import *
 from . import ADTDevTracer
-from ..hw.asc import *
+
 
 class DIR(IntEnum):
     RX = 0
     TX = 1
+
 
 def msg(message, direction=None, regtype=None, name=None):
     def f(x):
@@ -19,20 +22,27 @@ def msg(message, direction=None, regtype=None, name=None):
         x.regtype = regtype
         x.name = name
         return x
+
     return f
+
 
 def msg_log(*args, **kwargs):
     def x(self, msg):
         return False
+
     return msg(*args, **kwargs)(x)
+
 
 def msg_ign(*args, **kwargs):
     def x(self, msg):
         return True
+
     return msg(*args, **kwargs)(x)
+
 
 class EPState(object):
     pass
+
 
 class EP(object):
     NAME = None
@@ -94,8 +104,10 @@ class EP(object):
         self.log(f"{d}{msgtype:#x}({name}) {r0.value:016x} ({r0.str_fields()})")
         return True
 
+
 class EPContainer(object):
     pass
+
 
 class BaseASCTracer(ADTDevTracer):
     DEFAULT_MODE = TraceMode.SYNC
@@ -117,15 +129,19 @@ class BaseASCTracer(ADTDevTracer):
     def w_INBOX1(self, inbox1):
         inbox0 = self.asc.cached.INBOX0.reg
         if self.verbose >= 2:
-            self.log(f"SEND: {inbox0.value:016x}:{inbox1.value:016x} " +
-                    f"{inbox0.str_fields()} | {inbox1.str_fields()}")
+            self.log(
+                f"SEND: {inbox0.value:016x}:{inbox1.value:016x} "
+                + f"{inbox0.str_fields()} | {inbox1.str_fields()}"
+            )
         self.handle_msg(DIR.TX, inbox0, inbox1)
 
     def r_OUTBOX1(self, outbox1):
         outbox0 = self.asc.cached.OUTBOX0.reg
         if self.verbose >= 2:
-            self.log(f"RECV: {outbox0.value:016x}:{outbox1.value:016x} " +
-                    f"{outbox0.str_fields()} | {outbox1.str_fields()}")
+            self.log(
+                f"RECV: {outbox0.value:016x}:{outbox1.value:016x} "
+                + f"{outbox0.str_fields()} | {outbox1.str_fields()}"
+            )
         self.handle_msg(DIR.RX, outbox0, outbox1)
 
     def init_state(self):
@@ -160,7 +176,11 @@ class BaseASCTracer(ADTDevTracer):
             i = getattr(self, name)
             if not callable(i) or not getattr(i, "is_message", False):
                 continue
-            self.msgmap[i.direction, i.endpoint, i.message] = getattr(self, name), name, i.regtype
+            self.msgmap[i.direction, i.endpoint, i.message] = (
+                getattr(self, name),
+                name,
+                i.regtype,
+            )
 
         self.epmap = {}
         self.ep = EPContainer()
@@ -183,16 +203,19 @@ class BaseASCTracer(ADTDevTracer):
                 setattr(self.ep, ep.name, ep)
                 ep.start()
 
+
 # System endpoints
 
 ## Management endpoint
 
-from ..fw.asc.mgmt import ManagementMessage, Mgmt_EPMap, Mgmt_EPMap_Ack, Mgmt_StartEP, Mgmt_SetAPPower, Mgmt_SetIOPPower, Mgmt_IOPPowerAck
+from ..fw.asc.mgmt import (ManagementMessage, Mgmt_EPMap, Mgmt_EPMap_Ack, Mgmt_IOPPowerAck,
+                           Mgmt_SetAPPower, Mgmt_SetIOPPower, Mgmt_StartEP)
+
 
 class Management(EP):
     BASE_MESSAGE = ManagementMessage
 
-    HELLO =     msg_log(1, DIR.RX)
+    HELLO = msg_log(1, DIR.RX)
     HELLO_ACK = msg_log(2, DIR.TX)
 
     @msg(5, DIR.TX, Mgmt_StartEP)
@@ -203,7 +226,7 @@ class Management(EP):
             self.log(f"  Starting endpoint #{msg.EP:#02x} ({ep.name})")
         else:
             self.log(f"  Starting endpoint #{msg.EP:#02x}")
-        #return True
+        # return True
 
     Init = msg_log(6, DIR.TX)
 
@@ -224,12 +247,14 @@ class Management(EP):
     SetIOPPower = msg_log(6, DIR.TX, Mgmt_SetIOPPower)
     SetIOPPowerAck = msg_log(7, DIR.TX, Mgmt_IOPPowerAck)
 
-    SetAPPower = msg_log(0x0b, DIR.TX, Mgmt_SetAPPower)
-    SetAPPowerAck = msg_log(0x0b, DIR.RX, Mgmt_SetAPPower)
+    SetAPPower = msg_log(0x0B, DIR.TX, Mgmt_SetAPPower)
+    SetAPPowerAck = msg_log(0x0B, DIR.RX, Mgmt_SetAPPower)
+
 
 ## Syslog endpoint
 
-from ..fw.asc.syslog import SyslogMessage, Syslog_Init, Syslog_GetBuf, Syslog_Log
+from ..fw.asc.syslog import Syslog_GetBuf, Syslog_Init, Syslog_Log, SyslogMessage
+
 
 class Syslog(EP):
     BASE_MESSAGE = SyslogMessage
@@ -261,11 +286,12 @@ class Syslog(EP):
 
     Log_Ack = msg_ign(5, DIR.TX, Syslog_Log)
 
+
 class ASCTracer(BaseASCTracer):
     ENDPOINTS = {
         0: Management,
-        #1: CrashLog,
+        # 1: CrashLog,
         2: Syslog,
-        #3: KDebug,
-        #4: IOReporting,
+        # 3: KDebug,
+        # 4: IOReporting,
     }

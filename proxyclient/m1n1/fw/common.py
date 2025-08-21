@@ -2,8 +2,9 @@
 
 from dataclasses import dataclass
 from enum import IntEnum
-from m1n1.utils import *
+
 from construct import *
+from m1n1.utils import *
 
 uint8_t = Int8ul
 int16_t = Int16sl
@@ -18,19 +19,28 @@ int_ = int32_t
 ulong = uint64_t
 long_ = int64_t
 
+
 def Bool(c):
     return ExprAdapter(c, lambda d, ctx: bool(d & 1), lambda d, ctx: int(d))
 
+
 def SizedArray(count, svar, subcon):
-    return Padded(subcon.sizeof() * count, Array(lambda ctx: min(count, ctx.get(svar, ctx._.get(svar))), subcon))
+    return Padded(
+        subcon.sizeof() * count,
+        Array(lambda ctx: min(count, ctx.get(svar, ctx._.get(svar))), subcon),
+    )
+
 
 def SizedBytes(count, svar):
     return Lazy(Padded(count, Bytes(lambda ctx: ctx.get(svar) or ctx._.get(svar))))
 
+
 def UnkBytes(s):
     return Default(HexDump(Bytes(s)), b"\x00" * s)
 
+
 bool_ = Bool(Int8ul)
+
 
 class OSObject(Construct):
     TYPE = None
@@ -53,7 +63,7 @@ class OSObject(Construct):
         elif tag == "s":
             length = Int32ul.parse_stream(stream)
             s = stream.read(length).decode("utf-8")
-            assert stream.read(1) == b'\0'
+            assert stream.read(1) == b"\0"
             return s
         else:
             raise Exception(f"Unknown object tag {tag!r}")
@@ -64,13 +74,15 @@ class OSObject(Construct):
     def _sizeof(self, context, path):
         return None
 
+
 class OSDictionary(OSObject):
-    TYPE = 'd'
+    TYPE = "d"
+
 
 class OSSerialize(Construct):
     def _parse(self, stream, context, path, recurse=False):
         hdr = Int32ul.parse_stream(stream)
-        if hdr != 0xd3:
+        if hdr != 0xD3:
             raise Exception("Bad header")
 
         obj, last = self.parse_obj(stream)
@@ -86,10 +98,10 @@ class OSSerialize(Construct):
         tag = Int32ul.parse_stream(stream)
 
         last = bool(tag & 0x80000000)
-        otype = (tag >> 24) & 0x1f
-        size = tag & 0xffffff
+        otype = (tag >> 24) & 0x1F
+        size = tag & 0xFFFFFF
 
-        #print(f"{'  '*level} @{stream.tell():#x} {otype} {last} {size}")
+        # print(f"{'  '*level} @{stream.tell():#x} {otype} {last} {size}")
 
         if otype == 1:
             d = {}
@@ -116,7 +128,7 @@ class OSSerialize(Construct):
         else:
             raise Exception(f"Unknown tag {otype}")
 
-        #print(f"{'  '*level}  => {d}")
+        # print(f"{'  '*level}  => {d}")
         return d, last
 
     def build_obj(self, obj, stream, last=True, level=0):
@@ -159,12 +171,12 @@ class OSSerialize(Construct):
             stream.write(bytes(4 - (pos & 3)))
 
     def _build(self, obj, stream, context, path):
-        Int32ul.build_stream(0xd3, stream)
+        Int32ul.build_stream(0xD3, stream)
         self.build_obj(obj, stream)
 
     def _sizeof(self, context, path):
         return None
 
+
 def string(size):
     return Padded(size, CString("utf8"))
-

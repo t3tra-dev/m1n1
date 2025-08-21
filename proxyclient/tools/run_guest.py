@@ -1,46 +1,68 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib, traceback
+import pathlib
+import sys
+import traceback
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
-import argparse, pathlib
+import argparse
+import pathlib
 from io import BytesIO
+
 
 def volumespec(s):
     return tuple(s.split(":", 2))
 
-parser = argparse.ArgumentParser(description='Run a Mach-O payload under the hypervisor')
-parser.add_argument('-s', '--symbols', type=pathlib.Path)
-parser.add_argument('-m', '--script', type=pathlib.Path, action='append', default=[])
-parser.add_argument('-c', '--command', action="append", default=[])
-parser.add_argument('-S', '--shell', action="store_true")
-parser.add_argument('-e', '--hook-exceptions', action="store_true")
-parser.add_argument('-d', '--debug-xnu', action="store_true")
-parser.add_argument('-l', '--logfile', type=pathlib.Path)
-parser.add_argument('-C', '--cpus', default=None)
-parser.add_argument('-r', '--raw', action="store_true")
-parser.add_argument('-E', '--entry-point', action="store", type=int, help="Entry point for the raw image", default=0x800)
-parser.add_argument('-a', '--append-payload', type=pathlib.Path, action="append", default=[])
-parser.add_argument('-v', '--volume', type=volumespec, action='append',
-                    help='Attach a 9P virtio device for file export to the guest. The argument is a host path to the '
-                         'exported tree, joined by colon (\':\') with a tag under which the tree will be advertised '
-                         'on the guest side.')
-parser.add_argument('payload', type=pathlib.Path)
-parser.add_argument('boot_args', default=[], nargs="*")
+
+parser = argparse.ArgumentParser(
+    description="Run a Mach-O payload under the hypervisor"
+)
+parser.add_argument("-s", "--symbols", type=pathlib.Path)
+parser.add_argument("-m", "--script", type=pathlib.Path, action="append", default=[])
+parser.add_argument("-c", "--command", action="append", default=[])
+parser.add_argument("-S", "--shell", action="store_true")
+parser.add_argument("-e", "--hook-exceptions", action="store_true")
+parser.add_argument("-d", "--debug-xnu", action="store_true")
+parser.add_argument("-l", "--logfile", type=pathlib.Path)
+parser.add_argument("-C", "--cpus", default=None)
+parser.add_argument("-r", "--raw", action="store_true")
+parser.add_argument(
+    "-E",
+    "--entry-point",
+    action="store",
+    type=int,
+    help="Entry point for the raw image",
+    default=0x800,
+)
+parser.add_argument(
+    "-a", "--append-payload", type=pathlib.Path, action="append", default=[]
+)
+parser.add_argument(
+    "-v",
+    "--volume",
+    type=volumespec,
+    action="append",
+    help="Attach a 9P virtio device for file export to the guest. The argument is a host path to the "
+    "exported tree, joined by colon (':') with a tag under which the tree will be advertised "
+    "on the guest side.",
+)
+parser.add_argument("payload", type=pathlib.Path)
+parser.add_argument("boot_args", default=[], nargs="*")
 args = parser.parse_args()
 
-from m1n1.proxy import *
-from m1n1.proxyutils import *
-from m1n1.utils import *
-from m1n1.shell import run_shell
 from m1n1.hv import HV
 from m1n1.hv.virtio import Virtio9PTransport
 from m1n1.hw.pmu import PMU
+from m1n1.proxy import *
+from m1n1.proxyutils import *
+from m1n1.shell import run_shell
+from m1n1.utils import *
 
 iface = UartInterface()
 p = M1N1Proxy(iface, debug=False)
 bootstrap_port(iface, p)
-u = ProxyUtils(p, heap_size = 128 * 1024 * 1024)
+u = ProxyUtils(p, heap_size=128 * 1024 * 1024)
 
 hv = HV(iface, p, u)
 

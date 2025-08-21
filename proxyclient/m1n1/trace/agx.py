@@ -1,34 +1,43 @@
 # SPDX-License-Identifier: MIT
 
-import textwrap, os.path, json, datetime, ctypes, plistlib
-from .asc import *
-from ..hw.uat import UAT, MemoryAttr, PTE, Page_PTE, TTBR
-from ..hw.agx import *
-
-from ..fw.agx.initdata import InitData, InitData_RegionC
-from ..fw.agx.channels import *
-from ..fw.agx.cmdqueue import *
-from ..fw.agx.microsequence import *
-from ..fw.agx.handoff import *
-
-from m1n1.proxyutils import RegMonitor
-from m1n1.constructutils import *
-from m1n1.trace import Tracer
+import ctypes
+import datetime
+import json
+import os.path
+import plistlib
+import textwrap
 
 from construct import *
+from m1n1.constructutils import *
+from m1n1.proxyutils import RegMonitor
+from m1n1.trace import Tracer
+
+from ..fw.agx.channels import *
+from ..fw.agx.cmdqueue import *
+from ..fw.agx.handoff import *
+from ..fw.agx.initdata import InitData, InitData_RegionC
+from ..fw.agx.microsequence import *
+from ..hw.agx import *
+from ..hw.uat import PTE, TTBR, UAT, MemoryAttr, Page_PTE
+from .asc import *
+
 
 class ChannelTraceState(object):
     pass
 
+
 class CommandQueueState(object):
     pass
 
+
 class GpuMsg(Register64):
-    TYPE    = 55, 48
+    TYPE = 55, 48
+
 
 class PongMsg(GpuMsg):
-    TYPE    = 59, 52
-    UNK     = 47, 0
+    TYPE = 59, 52
+    UNK = 47, 0
+
 
 class PongEp(EP):
     # This endpoint receives pongs. The cpu code reads some status registers after receiving one
@@ -53,9 +62,11 @@ class PongEp(EP):
         self.tracer.pong_init(msg.UNK)
         return True
 
+
 class KickMsg(GpuMsg):
-    TYPE    = 59, 52
-    KICK    = 7, 0 # Seen: 17, 16 (common), 9, 8, 1 (common), 0 (common)
+    TYPE = 59, 52
+    KICK = 7, 0  # Seen: 17, 16 (common), 9, 8, 1 (common), 0 (common)
+
 
 class KickEp(EP):
     BASE_MESSAGE = GpuMsg
@@ -74,6 +85,7 @@ class KickEp(EP):
             self.log(f"  FWRing Kick {msg}")
         self.tracer.fwkick(msg.KICK)
         return True
+
 
 class ChannelTracer(Reloadable):
     STATE_FIELDS = ChannelStateFields
@@ -104,8 +116,14 @@ class ChannelTracer(Reloadable):
         if self.name == "FWLog":
             base = self.tracer.state.fwlog_ring2
 
-        self.channel = Channel(self.u, self.uat, self.info, channelRings[index], base=base,
-                               state_fields=self.STATE_FIELDS)
+        self.channel = Channel(
+            self.u,
+            self.uat,
+            self.info,
+            channelRings[index],
+            base=base,
+            state_fields=self.STATE_FIELDS,
+        )
         for i in range(self.ring_count):
             for addr, size in self.channel.rb_maps[i]:
                 self.log(f"rb_map[{i}] {addr:#x} ({size:#x})")
@@ -167,13 +185,13 @@ class ChannelTracer(Reloadable):
         if tail >= count:
             raise Exception(f"Message index {tail:#x} >= {count:#x}")
         if cur != tail:
-            #self.log(f"{cur:#x} -> {tail:#x}")
+            # self.log(f"{cur:#x} -> {tail:#x}")
             while cur != tail:
                 msg = self.channel.get_message(ring, cur, self.tracer.meta_gpuvm)
                 self.log(f"Message @{ring}.{cur}:\n{msg!s}")
                 self.tracer.handle_ringmsg(msg)
-                #if self.index < 12:
-                    #self.hv.run_shell()
+                # if self.index < 12:
+                # self.hv.run_shell()
                 cur = (cur + 1) % count
             self.state.tail[ring] = cur
 
@@ -184,31 +202,42 @@ class ChannelTracer(Reloadable):
                     self.state.tail[ring] = self.channel.state[ring].WRITE_PTR.val
 
             for base in range(0, 0x30 * self.ring_count, 0x30):
-                p = self.uat.iotranslate(0, self.channel.state_addr + base + self.RPTR, 4)[0][0]
-                self.hv.add_tracer(irange(p, 4),
-                                   f"ChannelTracer/{self.name}",
-                                   mode=TraceMode.SYNC,
-                                   read=self.state_read,
-                                   write=self.state_write,
-                                   off=base + self.RPTR)
-                p = self.uat.iotranslate(0, self.channel.state_addr + base + self.WPTR, 4)[0][0]
-                self.hv.add_tracer(irange(p, 4),
-                                   f"ChannelTracer/{self.name}",
-                                   mode=TraceMode.SYNC,
-                                   read=self.state_read,
-                                   write=self.state_write,
-                                   off=base + self.WPTR)
+                p = self.uat.iotranslate(
+                    0, self.channel.state_addr + base + self.RPTR, 4
+                )[0][0]
+                self.hv.add_tracer(
+                    irange(p, 4),
+                    f"ChannelTracer/{self.name}",
+                    mode=TraceMode.SYNC,
+                    read=self.state_read,
+                    write=self.state_write,
+                    off=base + self.RPTR,
+                )
+                p = self.uat.iotranslate(
+                    0, self.channel.state_addr + base + self.WPTR, 4
+                )[0][0]
+                self.hv.add_tracer(
+                    irange(p, 4),
+                    f"ChannelTracer/{self.name}",
+                    mode=TraceMode.SYNC,
+                    read=self.state_read,
+                    write=self.state_write,
+                    off=base + self.WPTR,
+                )
         else:
             self.hv.clear_tracers(f"ChannelTracer/{self.name}")
         self.state.active = active
 
+
 ChannelTracer = ChannelTracer._reloadcls()
 CommandQueueInfo = CommandQueueInfo._reloadcls()
+
 
 class FWCtlChannelTracer(ChannelTracer):
     STATE_FIELDS = FWControlStateFields
     WPTR = 0x10
     RPTR = 0x00
+
 
 class CommandQueueTracer(Reloadable):
     def __init__(self, tracer, info_addr, new_queue, queue_type):
@@ -247,19 +276,23 @@ class CommandQueueTracer(Reloadable):
                 qtype = ["TA", "3D", "CP"][queue_type]
                 fname = f"{datetime.datetime.now().isoformat()}-{tracer.state.queue_seq:04d}-{qtype}.json"
                 self.dumpfile = open(os.path.join(tracer.cmd_dump_dir, fname), "w")
-                json.dump({
-                    "compatible": tracer.dev_sgx.compatible,
-                    "chip_id": tracer.chip_id,
-                    "version": Ver._version,
-                    "type": qtype,
-                }, self.dumpfile)
+                json.dump(
+                    {
+                        "compatible": tracer.dev_sgx.compatible,
+                        "chip_id": tracer.chip_id,
+                        "version": Ver._version,
+                        "type": qtype,
+                    },
+                    self.dumpfile,
+                )
                 self.dumpfile.write("\n")
                 self.dumpfile.flush()
                 tracer.state.queue_seq += 1
 
-
     def update_info(self):
-        self.info = CommandQueueInfo.parse_stream(self.tracer.get_stream(0, self.info_addr))
+        self.info = CommandQueueInfo.parse_stream(
+            self.tracer.get_stream(0, self.info_addr)
+        )
 
     def log(self, msg):
         self.tracer.log(f"[CQ@{self.info_addr:#x}] {msg}")
@@ -281,7 +314,6 @@ class CommandQueueTracer(Reloadable):
 
         self.log(f"Got workmsg: wptr={workmsg.head:#x} rptr={self.state.rptr:#x}")
         self.log(f"Queue info: {self.info}")
-
 
         assert self.state.rptr < self.rb_size
         assert workmsg.head < self.rb_size
@@ -314,10 +346,12 @@ class CommandQueueTracer(Reloadable):
             self.state.rptr = None
         self.state.active = active
 
+
 CmdBufWork = CmdBufWork._reloadcls()
 CommandQueueTracer = CommandQueueTracer._reloadcls()
 InitData = InitData._reloadcls(True)
 HelperArg = HelperArg._reloadcls()
+
 
 class HandoffTracer(Tracer):
     DEFAULT_MODE = TraceMode.SYNC
@@ -329,6 +363,7 @@ class HandoffTracer(Tracer):
 
     def start(self):
         self.trace_regmap(self.base, 0x4000, GFXHandoffStruct, name="regs")
+
 
 class SGXTracer(ADTDevTracer):
     DEFAULT_MODE = TraceMode.HOOK
@@ -366,11 +401,9 @@ class SGXTracer(ADTDevTracer):
 
         super().hook_w(addr, val, width, **kwargs)
 
+
 class AGXTracer(ASCTracer):
-    ENDPOINTS = {
-        0x20: PongEp,
-        0x21: KickEp
-    }
+    ENDPOINTS = {0x20: PongEp, 0x21: KickEp}
 
     REGMAPS = [ASCRegs]
     NAMES = ["asc"]
@@ -434,11 +467,11 @@ class AGXTracer(ASCTracer):
         self.counters = {}
         counters = os.getenv("COUNTERS", None)
         if counters:
-            pl = plistlib.load(open(counters,"rb"))
+            pl = plistlib.load(open(counters, "rb"))
             for ctr in pl["DeviceCounters"]:
                 spec = pl[ctr]
                 spec["Name"] = ctr
-                self.counters[(spec['Partition'], spec['Select'])] = spec
+                self.counters[(spec["Partition"], spec["Select"])] = spec
             self.log(f"Loaded {len(self.counters)} performance counters")
 
     def init_agxdecode(self, path):
@@ -450,8 +483,12 @@ class AGXTracer(ASCTracer):
 
         self.agxdecode = lib
 
-        read_gpu_mem = ctypes.CFUNCTYPE(ctypes.c_size_t, ctypes.c_uint64, ctypes.c_size_t, ctypes.c_void_p)
-        stream_write = ctypes.CFUNCTYPE(ctypes.c_ssize_t, ctypes.POINTER(ctypes.c_char), ctypes.c_size_t)
+        read_gpu_mem = ctypes.CFUNCTYPE(
+            ctypes.c_size_t, ctypes.c_uint64, ctypes.c_size_t, ctypes.c_void_p
+        )
+        stream_write = ctypes.CFUNCTYPE(
+            ctypes.c_ssize_t, ctypes.POINTER(ctypes.c_char), ctypes.c_size_t
+        )
 
         class libagxdecode_config(ctypes.Structure):
             _fields_ = [
@@ -475,13 +512,27 @@ class AGXTracer(ASCTracer):
         self._read_gpu_mem = read_gpu_mem(_read_gpu_mem)
         self._stream_write = stream_write(_stream_write)
 
-        config = libagxdecode_config(self.chip_id, self._read_gpu_mem, self._stream_write)
+        config = libagxdecode_config(
+            self.chip_id, self._read_gpu_mem, self._stream_write
+        )
 
         self.agxdecode.libagxdecode_init(ctypes.pointer(config))
 
-        self.agxdecode.libagxdecode_vdm.argtypes = [ctypes.c_uint64, ctypes.c_char_p, ctypes.c_bool]
-        self.agxdecode.libagxdecode_cdm.argtypes = [ctypes.c_uint64, ctypes.c_char_p, ctypes.c_bool]
-        self.agxdecode.libagxdecode_usc.argtypes = [ctypes.c_uint64, ctypes.c_char_p, ctypes.c_bool]
+        self.agxdecode.libagxdecode_vdm.argtypes = [
+            ctypes.c_uint64,
+            ctypes.c_char_p,
+            ctypes.c_bool,
+        ]
+        self.agxdecode.libagxdecode_cdm.argtypes = [
+            ctypes.c_uint64,
+            ctypes.c_char_p,
+            ctypes.c_bool,
+        ]
+        self.agxdecode.libagxdecode_usc.argtypes = [
+            ctypes.c_uint64,
+            ctypes.c_char_p,
+            ctypes.c_bool,
+        ]
 
     def get_cmdqueue(self, info_addr, new_queue, queue_type):
         if info_addr in self.cmdqueues and not new_queue:
@@ -496,13 +547,15 @@ class AGXTracer(ASCTracer):
         self.hv.clear_tracers(f"UATTTBRTracer")
 
     def add_ttbr_tracers(self):
-        self.hv.add_tracer(irange(self.gpu_region, UAT.NUM_CONTEXTS * 16),
-                        f"UATTTBRTracer",
-                        mode=TraceMode.WSYNC,
-                        write=self.uat_write,
-                        iova=0,
-                        base=self.gpu_region,
-                        level=3)
+        self.hv.add_tracer(
+            irange(self.gpu_region, UAT.NUM_CONTEXTS * 16),
+            f"UATTTBRTracer",
+            mode=TraceMode.WSYNC,
+            write=self.uat_write,
+            iova=0,
+            base=self.gpu_region,
+            level=3,
+        )
 
     def clear_uatmap_tracers(self, ctx=None):
         if ctx is None:
@@ -527,19 +580,21 @@ class AGXTracer(ASCTracer):
             return
 
         def trace_pt(start, end, idx, pte, level, sparse):
-            if start >= 0xf8000000000 and (ctx != 0 or not self.trace_kernmap):
+            if start >= 0xF8000000000 and (ctx != 0 or not self.trace_kernmap):
                 return
-            if start < 0xf8000000000 and not self.trace_usermap:
+            if start < 0xF8000000000 and not self.trace_usermap:
                 return
             self.log(f"Add UATMapTracer/{ctx} {start:#x}")
-            self.hv.add_tracer(irange(pte.offset(), 0x4000),
-                            f"UATMapTracer/{ctx}",
-                            mode=TraceMode.WSYNC,
-                            write=self.uat_write,
-                            iova=start,
-                            base=pte.offset(),
-                            level=2 - level,
-                            ctx=ctx)
+            self.hv.add_tracer(
+                irange(pte.offset(), 0x4000),
+                f"UATMapTracer/{ctx}",
+                mode=TraceMode.WSYNC,
+                write=self.uat_write,
+                iova=start,
+                base=pte.offset(),
+                level=2 - level,
+                ctx=ctx,
+            )
 
         self.uat.foreach_table(ctx, trace_pt)
 
@@ -569,7 +624,9 @@ class AGXTracer(ASCTracer):
         off = (evt.addr - base) // 8
         sh = ["NS", "??", "OS", "IS"]
         a = f"{evt.flags.ATTR:02x}:{sh[evt.flags.SH]}"
-        self.log(f"UAT <{a}> write L{level} at {ctx}:{iova:#x} (#{off:#x}) -> {evt.data}")
+        self.log(
+            f"UAT <{a}> write L{level} at {ctx}:{iova:#x} (#{off:#x}) -> {evt.data}"
+        )
 
         if level == 3:
             ctx = off // 2
@@ -578,7 +635,7 @@ class AGXTracer(ASCTracer):
                 return
 
             if is_kernel:
-                iova += 0xf8000000000
+                iova += 0xF8000000000
             pte = TTBR(evt.data)
             if not pte.valid():
                 self.log(f"Context {ctx} invalidated")
@@ -595,7 +652,7 @@ class AGXTracer(ASCTracer):
             self.add_gpuvm_tracers(ctx)
         else:
             self.uat.invalidate_cache()
-            is_kernel = iova >= 0xf8000000000
+            is_kernel = iova >= 0xF8000000000
             iova += off << (level * 11 + 14)
             if level == 0:
                 pte = Page_PTE(evt.data)
@@ -609,8 +666,7 @@ class AGXTracer(ASCTracer):
                 paddr = self.va_to_pa[(ctx, level, iova)]
             except KeyError:
                 return
-            self.hv.del_tracer(irange(paddr, 0x4000),
-                               f"UATMapTracer/{ctx}")
+            self.hv.del_tracer(irange(paddr, 0x4000), f"UATMapTracer/{ctx}")
             del self.va_to_pa[(ctx, level, iova)]
             return
 
@@ -621,17 +677,19 @@ class AGXTracer(ASCTracer):
 
         self.va_to_pa[(ctx, level, iova)] = pte.offset()
         level -= 1
-        self.hv.add_tracer(irange(pte.offset(), 0x4000),
-                           f"UATMapTracer/{ctx}",
-                           mode=TraceMode.WSYNC,
-                           write=self.uat_write,
-                           iova=iova,
-                           base=pte.offset(),
-                           level=level,
-                           ctx=ctx)
+        self.hv.add_tracer(
+            irange(pte.offset(), 0x4000),
+            f"UATMapTracer/{ctx}",
+            mode=TraceMode.WSYNC,
+            write=self.uat_write,
+            iova=iova,
+            base=pte.offset(),
+            level=level,
+            ctx=ctx,
+        )
 
     def uat_page_mapped(self, iova, pte, ctx=0):
-        if iova >= 0xf8000000000 and ctx != 0:
+        if iova >= 0xF8000000000 and ctx != 0:
             return
         if not pte.valid():
             self.log(f"UAT unmap {ctx}:{iova:#x} ({pte})")
@@ -646,7 +704,7 @@ class AGXTracer(ASCTracer):
         paddr = pte.offset()
         self.log(f"UAT map {ctx}:{iova:#x} -> {paddr:#x} ({pte})")
         if paddr < 0x800000000:
-            return # MMIO, ignore
+            return  # MMIO, ignore
 
         if not self.trace_userva and ctx != 0 and iova < 0x80_00000000:
             return
@@ -654,14 +712,16 @@ class AGXTracer(ASCTracer):
             return
 
         self.va_to_pa[(ctx, iova)] = paddr
-        self.hv.add_tracer(irange(paddr, 0x4000),
-                           f"GPUVM/{ctx}",
-                           mode=TraceMode.ASYNC,
-                           read=self.event_gpuvm,
-                           write=self.event_gpuvm,
-                           iova=iova,
-                           paddr=paddr,
-                           ctx=ctx)
+        self.hv.add_tracer(
+            irange(paddr, 0x4000),
+            f"GPUVM/{ctx}",
+            mode=TraceMode.ASYNC,
+            read=self.event_gpuvm,
+            write=self.event_gpuvm,
+            iova=iova,
+            paddr=paddr,
+            ctx=ctx,
+        )
 
         if ctx == 0:
             self.clear_stats_tracers()
@@ -681,11 +741,13 @@ class AGXTracer(ASCTracer):
         dinfo = ""
         if name is not None and base is not None:
             dinfo = f"[{name} + {iova - base:#x}]"
-        logline = (f"[cpu{evt.flags.CPU}] GPUVM[{ctx}/{self.vmcnt:5}]: <{a}>{t}.{1<<evt.flags.WIDTH:<2}{m} " +
-                   f"{iova:#x}({evt.addr:#x}){dinfo} = {evt.data:#x}")
+        logline = (
+            f"[cpu{evt.flags.CPU}] GPUVM[{ctx}/{self.vmcnt:5}]: <{a}>{t}.{1<<evt.flags.WIDTH:<2}{m} "
+            + f"{iova:#x}({evt.addr:#x}){dinfo} = {evt.data:#x}"
+        )
         self.log(logline, show_cpu=False)
         self.vmcnt += 1
-        #self.mon.poll()
+        # self.mon.poll()
 
     def meta_gpuvm(self, ctx, iova, size=None):
         if size is None:
@@ -693,7 +755,7 @@ class AGXTracer(ASCTracer):
             return f"PTE: {pte.describe()}"
 
         meta = ""
-        iova &= 0xfffffffffff
+        iova &= 0xFFFFFFFFFFF
         for off in range(size):
             offva = iova + off
             if offva in self.readlog:
@@ -715,11 +777,13 @@ class AGXTracer(ASCTracer):
 
     def mitigate_exploits(self):
         def hook(addr, val, width):
-            return 0 # Begone, GPU kernel mode in user contexts
+            return 0  # Begone, GPU kernel mode in user contexts
 
         for i in range(1, 64):
             addr = self.gpu_region + i * 16 + 8
-            self.hv.add_tracer(irange(addr, 8), "UATMitigation", TraceMode.HOOK, None, hook)
+            self.hv.add_tracer(
+                irange(addr, 8), "UATMitigation", TraceMode.HOOK, None, hook
+            )
 
     def start(self):
         if self.skip_asc_tracing and getattr(self.state, "initdata", None) is not None:
@@ -727,7 +791,7 @@ class AGXTracer(ASCTracer):
         else:
             super().start()
 
-        #self.mitigate_exploits()
+        # self.mitigate_exploits()
 
         self.clear_ttbr_tracers()
         self.clear_uatmap_tracers()
@@ -736,7 +800,7 @@ class AGXTracer(ASCTracer):
         self.clear_gpuvm_tracers()
         self.add_mon_regions()
 
-        #self.handoff_tracer.start()
+        # self.handoff_tracer.start()
         self.init_channels()
         if self.state.active:
             self.resume()
@@ -752,7 +816,7 @@ class AGXTracer(ASCTracer):
         super().stop()
 
     def mon_addva(self, ctx, va, size, name=""):
-        self.mon.add(va, size, name, readfn= lambda a, s: self.uat.ioread(ctx, a, s))
+        self.mon.add(va, size, name, readfn=lambda a, s: self.uat.ioread(ctx, a, s))
 
     def handle_ringmsg(self, msg):
         self.uat.invalidate_cache()
@@ -817,11 +881,12 @@ class AGXTracer(ASCTracer):
     def configure_perf_counters(self):
         self.log("=== Performance counter config ==")
         rc = self.state.initdata.regionC = InitData_RegionC.parse_stream(
-            self.get_stream(0, self.state.initdata.regionC._addr))
+            self.get_stream(0, self.state.initdata.regionC._addr)
+        )
         for i in range(rc.perfctr_count):
             cfg = self.state.initdata.regionC.perfctrs[i]
             tail = ""
-            partition = cfg.regs & 0x7f
+            partition = cfg.regs & 0x7F
             if partition == 1:
                 select = (cfg.en_mask << 32) | cfg.dis_mask
             else:
@@ -829,7 +894,9 @@ class AGXTracer(ASCTracer):
             spec = self.counters.get((partition, cfg.source_mask), None)
             if spec:
                 tail = f" {spec['Name']} [+{spec['Increment']} {spec['Partition']}/{spec['Select']:x}/{spec.get('SourceMask', 0)}]: {spec['type']}:{spec.get('Description', None)}"
-            self.log(f"#{i:3d} R={cfg.regs:016x} M={cfg.dis_mask:8x}/{cfg.en_mask:8x} S={cfg.source_mask:#10x} B={cfg.base_reg:#x} T={cfg.unk_type} C={cfg.count} idx={cfg.index}{tail}")
+            self.log(
+                f"#{i:3d} R={cfg.regs:016x} M={cfg.dis_mask:8x}/{cfg.en_mask:8x} S={cfg.source_mask:#10x} B={cfg.base_reg:#x} T={cfg.unk_type} C={cfg.count} idx={cfg.index}{tail}"
+            )
 
         self.dump_perf_counters()
 
@@ -842,13 +909,20 @@ class AGXTracer(ASCTracer):
         self.log("=== Performance counter buffers ==")
         if rc.unkptr_8894 != 0:
             self.log(f"unkptr_8894 @ {rc.unkptr_8894:#x}")
-            chexdump(self.uat.ioread(0, rc.unkptr_8894, rc.size_889c), print_fn=self.log)
+            chexdump(
+                self.uat.ioread(0, rc.unkptr_8894, rc.size_889c), print_fn=self.log
+            )
         if rc.unkptr_88a0 != 0:
             self.log(f"unkptr_88a0 @ {rc.unkptr_88a0:#x}")
-            chexdump(self.uat.ioread(0, rc.unkptr_88a0, rc.size_889c), print_fn=self.log)
+            chexdump(
+                self.uat.ioread(0, rc.unkptr_88a0, rc.size_889c), print_fn=self.log
+            )
         if rc.unkptr_88a8 != 0:
             self.log(f"unkptr_88a8 @ {rc.unkptr_88a8:#x}")
-            chexdump(self.uat.ioread(0, rc.unkptr_88a8, rc.unkptr_88b4 - rc.unkptr_88a8), print_fn=self.log)
+            chexdump(
+                self.uat.ioread(0, rc.unkptr_88a8, rc.unkptr_88b4 - rc.unkptr_88a8),
+                print_fn=self.log,
+            )
             self.log(f"unkptr_88b4 @ {rc.unkptr_88b4:#x}")
             chexdump(self.uat.ioread(0, rc.unkptr_88b4, 0x1000), print_fn=self.log)
 
@@ -895,21 +969,24 @@ class AGXTracer(ASCTracer):
 
         self.log(f"  buffer_mgr @ {buffer_mgr._addr:#x}: {buffer_mgr!s}")
         self.log(f"    page_list @ {buffer_mgr.page_list_addr:#x}:")
-        chexdump(read(buffer_mgr.page_list_addr,
-                        buffer_mgr.page_list_size), print_fn=self.log)
+        chexdump(
+            read(buffer_mgr.page_list_addr, buffer_mgr.page_list_size),
+            print_fn=self.log,
+        )
         self.log(f"    block_list @ {buffer_mgr.block_list_addr:#x}:")
-        chexdump(read(buffer_mgr.block_list_addr,
-                        0x8000), print_fn=self.log)
-        #self.log(f"    unkptr_d8 @ {buffer_mgr.unkptr_d8:#x}:")
-        #chexdump(read(buffer_mgr.unkptr_d8, 0x4000), print_fn=self.log)
+        chexdump(read(buffer_mgr.block_list_addr, 0x8000), print_fn=self.log)
+        # self.log(f"    unkptr_d8 @ {buffer_mgr.unkptr_d8:#x}:")
+        # chexdump(read(buffer_mgr.unkptr_d8, 0x4000), print_fn=self.log)
 
     def read_func(self, off, size):
         data = b""
         while size > 0:
-            boundary = (off + 0x4000) & ~0x3fff
+            boundary = (off + 0x4000) & ~0x3FFF
             block = min(size, boundary - off)
             try:
-                data += self.uat.ioread(self.cur_context, off & 0x7fff_ffff_ffff_ffff, block)
+                data += self.uat.ioread(
+                    self.cur_context, off & 0x7FFF_FFFF_FFFF_FFFF, block
+                )
             except Exception:
                 break
             off += block
@@ -928,8 +1005,8 @@ class AGXTracer(ASCTracer):
 
         if wi.cmd.magic == 6:
             wi6 = wi.cmd
-            #self.log(f"  unkptr_14 @ {wi6.unkptr_14:#x}:")
-            #chexdump(kread(wi6.unkptr_14, 0x100), print_fn=self.log)
+            # self.log(f"  unkptr_14 @ {wi6.unkptr_14:#x}:")
+            # chexdump(kread(wi6.unkptr_14, 0x100), print_fn=self.log)
 
         elif wi.cmd.magic == 0:
             self.uat.invalidate_cache()
@@ -939,28 +1016,27 @@ class AGXTracer(ASCTracer):
             read = self.read_func
             self.cur_context = context
 
-            #chexdump(kread(wi0.addr, 0x600), print_fn=self.log)
+            # chexdump(kread(wi0.addr, 0x600), print_fn=self.log)
             self.log(f"  context_id = {context:#x}")
             self.dump_buffer_manager(wi0.buffer_mgr, kread, self.read_func)
             self.buffer_mgr_map[wi0.buffer_mgr_slot] = wi0.buffer_mgr_addr
-            #self.log(f"  unk_emptybuf @ {wi0.unk_emptybuf_addr:#x}:")
-            #chexdump(kread(wi0.unk_emptybuf_addr, 0x1000), print_fn=self.log)
+            # self.log(f"  unk_emptybuf @ {wi0.unk_emptybuf_addr:#x}:")
+            # chexdump(kread(wi0.unk_emptybuf_addr, 0x1000), print_fn=self.log)
 
-            #self.log(f"  unkptr_48 @ {wi0.unkptr_48:#x}:")
-            #chexdump(read(wi0.unkptr_48, 0x1000), print_fn=self.log)
-            #self.log(f"  unkptr_58 @ {wi0.unkptr_58:#x}:")
-            #chexdump(read(wi0.unkptr_58, 0x4000), print_fn=self.log)
-            #self.log(f"  unkptr_60 @ {wi0.unkptr_60:#x}:")
-            #chexdump(read(wi0.unkptr_60, 0x4000), print_fn=self.log)
+            # self.log(f"  unkptr_48 @ {wi0.unkptr_48:#x}:")
+            # chexdump(read(wi0.unkptr_48, 0x1000), print_fn=self.log)
+            # self.log(f"  unkptr_58 @ {wi0.unkptr_58:#x}:")
+            # chexdump(read(wi0.unkptr_58, 0x4000), print_fn=self.log)
+            # self.log(f"  unkptr_60 @ {wi0.unkptr_60:#x}:")
+            # chexdump(read(wi0.unkptr_60, 0x4000), print_fn=self.log)
 
-            #self.log(f"  unkptr_45c @ {wi0.unkptr_45c:#x}:")
-            #chexdump(read(wi0.unkptr_45c, 0x1800), print_fn=self.log)
+            # self.log(f"  unkptr_45c @ {wi0.unkptr_45c:#x}:")
+            # chexdump(read(wi0.unkptr_45c, 0x1800), print_fn=self.log)
 
             for i in wi0.microsequence.value:
                 i = i.cmd
                 if i.__class__.__name__ == "StartTACmd":
                     self.log(f"  # StartTACmd")
-
 
                     # self.log(f"    unkptr_24 @ {i.unkptr_24:#x}:")
                     # chexdump(read(i.unkptr_24, 0x100), print_fn=self.log)
@@ -969,7 +1045,6 @@ class AGXTracer(ASCTracer):
 
                 elif i.__class__.__name__ == "FinalizeTACmd":
                     self.log(f"  # FinalizeTACmd")
-
 
             self.log(f"    buf_thing @ {wi0.buf_thing_addr:#x}: {wi0.buf_thing!s}")
             self.log(f"      unkptr_18 @ {wi0.buf_thing.unkptr_18:#x}::")
@@ -982,8 +1057,8 @@ class AGXTracer(ASCTracer):
                     chexdump(data, print_fn=self.log)
                     blocks = wi0.struct_2.tvb_cluster_meta1 >> 50
                     tc = wi0.tiling_params.tile_count
-                    xt = (tc & 0xfff) + 1
-                    yt = ((tc >> 12) & 0xfff) + 1
+                    xt = (tc & 0xFFF) + 1
+                    yt = ((tc >> 12) & 0xFFF) + 1
                     self.log(f"      TILES {xt} {yt} {blocks}")
 
                     self.log(f"      meta2 @ {wi0.struct_2.tvb_cluster_meta2:#x}:")
@@ -996,38 +1071,46 @@ class AGXTracer(ASCTracer):
                     data = read(wi0.struct_2.tvb_cluster_meta4, 0x100000)
                     chexdump(data, print_fn=self.log)
                     data = read(wi0.struct_2.tvb_cluster_tilemaps, 0x400000)
-                    self.log(f"      cluster_tilemaps @ {wi0.struct_2.tvb_cluster_tilemaps:#x}: ({len(data):#x})")
+                    self.log(
+                        f"      cluster_tilemaps @ {wi0.struct_2.tvb_cluster_tilemaps:#x}: ({len(data):#x})"
+                    )
                     chexdump(data, print_fn=self.log)
                     data = read(wi0.struct_2.tvb_tilemap, 0x100000)
-                    self.log(f"      tilemaps @ {wi0.struct_2.tvb_tilemap:#x}: ({len(data):#x})")
+                    self.log(
+                        f"      tilemaps @ {wi0.struct_2.tvb_tilemap:#x}: ({len(data):#x})"
+                    )
                     chexdump(data, print_fn=self.log)
 
                 if wi0.struct_2.helper_arg != 0:
                     data = read(wi0.struct_2.helper_arg, 0x100000)
-                    self.log(f"      helper_arg @ {wi0.struct_2.helper_arg:#x}: ({len(data):#x})")
+                    self.log(
+                        f"      helper_arg @ {wi0.struct_2.helper_arg:#x}: ({len(data):#x})"
+                    )
                     chexdump(data, print_fn=self.log)
 
                 if self.agxdecode:
                     self.log("Decode VDM")
                     self.uat.invalidate_cache()
-                    self.agxdecode.libagxdecode_vdm(wi0.struct_2.encoder_addr, b"VDM", True)
+                    self.agxdecode.libagxdecode_vdm(
+                        wi0.struct_2.encoder_addr, b"VDM", True
+                    )
 
             regs = getattr(wi0, "registers", None)
             if regs is not None:
                 for reg in regs:
-                    if reg.number == 0x1c920: # meta1
+                    if reg.number == 0x1C920:  # meta1
                         self.log(f"      meta1 @ {reg.data:#x}:")
                         data = read(reg.data, 0x41000)
                         chexdump(data, print_fn=self.log)
-                    elif reg.number == 0x1c041: # clustering tilemaps
+                    elif reg.number == 0x1C041:  # clustering tilemaps
                         self.log(f"      cl_tilemaps @ {reg.data:#x}:")
                         data = read(reg.data, 0x100000)
                         chexdump(data, print_fn=self.log)
-                    elif reg.number == 0x1c039: # tilemaps
+                    elif reg.number == 0x1C039:  # tilemaps
                         self.log(f"      tilemap @ {reg.data:#x}:")
                         data = read(reg.data, 0x100000)
                         chexdump(data, print_fn=self.log)
-                    elif reg.number == 0x1c880:
+                    elif reg.number == 0x1C880:
                         if self.agxdecode:
                             self.log("Decode VDM")
                             self.uat.invalidate_cache()
@@ -1045,8 +1128,8 @@ class AGXTracer(ASCTracer):
 
         if wi.cmd.magic == 4:
             wi4 = wi.cmd
-            #self.log(f" completion_buf @ {wi4.completion_buf_addr:#x}: {wi4.completion_buf!s} ")
-            #chexdump(kread(wi4.completion_buf_addr, 0x1000), print_fn=self.log)
+            # self.log(f" completion_buf @ {wi4.completion_buf_addr:#x}: {wi4.completion_buf!s} ")
+            # chexdump(kread(wi4.completion_buf_addr, 0x1000), print_fn=self.log)
         elif wi.cmd.magic == 1:
             self.uat.invalidate_cache()
             wi1 = wi.cmd
@@ -1060,30 +1143,32 @@ class AGXTracer(ASCTracer):
                 if i.__class__.__name__ == "Start3DCmd":
                     cmd3d = i
                     self.log(f" 3D:")
-                    #self.log(f"  struct1 @ {cmd3d.struct1_addr:#x}: {cmd3d.struct1!s}")
-                    #self.log(f"  struct2 @ {cmd3d.struct2_addr:#x}: {cmd3d.struct2!s}")
-                    #self.log(f"    tvb_start_addr @ {cmd3d.struct2.tvb_start_addr:#x}:")
-                    #if cmd3d.struct2.tvb_start_addr:
-                        #chexdump(read(cmd3d.struct2.tvb_start_addr, 0x1000), print_fn=self.log)
-                    #self.log(f"    tvb_tilemap_addr @ {cmd3d.struct2.tvb_tilemap_addr:#x}:")
-                    #if cmd3d.struct2.tvb_tilemap_addr:
-                        #chexdump(read(cmd3d.struct2.tvb_tilemap_addr, 0x1000), print_fn=self.log)
+                    # self.log(f"  struct1 @ {cmd3d.struct1_addr:#x}: {cmd3d.struct1!s}")
+                    # self.log(f"  struct2 @ {cmd3d.struct2_addr:#x}: {cmd3d.struct2!s}")
+                    # self.log(f"    tvb_start_addr @ {cmd3d.struct2.tvb_start_addr:#x}:")
+                    # if cmd3d.struct2.tvb_start_addr:
+                    # chexdump(read(cmd3d.struct2.tvb_start_addr, 0x1000), print_fn=self.log)
+                    # self.log(f"    tvb_tilemap_addr @ {cmd3d.struct2.tvb_tilemap_addr:#x}:")
+                    # if cmd3d.struct2.tvb_tilemap_addr:
+                    # chexdump(read(cmd3d.struct2.tvb_tilemap_addr, 0x1000), print_fn=self.log)
                     # self.log(f"    aux_fb_ptr @ {cmd3d.struct2.aux_fb_ptr:#x}:")
                     # chexdump(read(cmd3d.struct2.aux_fb_ptr, 0x100), print_fn=self.log)
-                    #self.log(f"    pipeline_base @ {cmd3d.struct2.pipeline_base:#x}:")
-                    #chexdump(read(cmd3d.struct2.pipeline_base, 0x100), print_fn=self.log)
+                    # self.log(f"    pipeline_base @ {cmd3d.struct2.pipeline_base:#x}:")
+                    # chexdump(read(cmd3d.struct2.pipeline_base, 0x100), print_fn=self.log)
 
-                    self.log(f"  buf_thing @ {cmd3d.buf_thing_addr:#x}: {cmd3d.buf_thing!s}")
+                    self.log(
+                        f"  buf_thing @ {cmd3d.buf_thing_addr:#x}: {cmd3d.buf_thing!s}"
+                    )
                     self.log(f"    unkptr_18 @ {cmd3d.buf_thing.unkptr_18:#x}:")
                     chexdump(read(cmd3d.buf_thing.unkptr_18, 0x80), print_fn=self.log)
 
-                    #self.log(f"  unk_24 @ {cmd3d.unkptr_24:#x}: {cmd3d.unk_24!s}")
+                    # self.log(f"  unk_24 @ {cmd3d.unkptr_24:#x}: {cmd3d.unk_24!s}")
                     self.log(f"  struct6 @ {cmd3d.struct6_addr:#x}: {cmd3d.struct6!s}")
                     # self.log(f"    unknown_buffer @ {cmd3d.struct6.unknown_buffer:#x}:")
                     # chexdump(read(cmd3d.struct6.unknown_buffer, 0x1000), print_fn=self.log)
                     self.log(f"  struct7 @ {cmd3d.struct7_addr:#x}: {cmd3d.struct7!s}")
                     self.log(f"  unk_buf_ptr @ {cmd3d.unk_buf_ptr:#x}:")
-                    chexdump(kread(cmd3d.unk_buf_ptr, 0x11c), print_fn=self.log)
+                    chexdump(kread(cmd3d.unk_buf_ptr, 0x11C), print_fn=self.log)
                     self.log(f"  unk_buf2_ptr @ {cmd3d.unk_buf2_ptr:#x}:")
                     chexdump(kread(cmd3d.unk_buf2_ptr, 0x18), print_fn=self.log)
 
@@ -1093,12 +1178,12 @@ class AGXTracer(ASCTracer):
                     continue
                 self.log(f" Finalize:")
                 cmdfin = i
-                #self.log(f"  completion:")
-                #chexdump(kread(cmdfin.completion, 0x4), print_fn=self.log)
+                # self.log(f"  completion:")
+                # chexdump(kread(cmdfin.completion, 0x4), print_fn=self.log)
                 # self.log(f"  unkptr_1c @ {cmdfin.unkptr_1c:#x}:")
                 # chexdump(kread(cmdfin.unkptr_1c, 0x1000), print_fn=self.log)
-                #self.log(f"  unkptr_24 @ {cmdfin.unkptr_24:#x}:")
-                #chexdump(kread(cmdfin.unkptr_24, 0x100), print_fn=self.log)
+                # self.log(f"  unkptr_24 @ {cmdfin.unkptr_24:#x}:")
+                # chexdump(kread(cmdfin.unkptr_24, 0x100), print_fn=self.log)
                 # self.log(f"  unkptr_34 @ {cmdfin.unkptr_34:#x}:")
                 # chexdump(kread(cmdfin.unkptr_34, 0x1000), print_fn=self.log)
                 # self.log(f"  unkptr_3c @ {cmdfin.unkptr_3c:#x}:")
@@ -1108,22 +1193,23 @@ class AGXTracer(ASCTracer):
                 # self.log(f"  unkptr_64 @ {cmdfin.unkptr_64:#x}:")
                 # chexdump(kread(cmdfin.unkptr_64, 0x118), print_fn=self.log)
 
-            #self.log(f"  buf_thing @ {wi1.buf_thing_addr:#x}: {wi1.buf_thing!s}")
-            #self.log(f"    unkptr_18 @ {wi1.buf_thing.unkptr_18:#x}:")
-            #chexdump(read(wi1.buf_thing.unkptr_18, 0x1000), print_fn=self.log)
+            # self.log(f"  buf_thing @ {wi1.buf_thing_addr:#x}: {wi1.buf_thing!s}")
+            # self.log(f"    unkptr_18 @ {wi1.buf_thing.unkptr_18:#x}:")
+            # chexdump(read(wi1.buf_thing.unkptr_18, 0x1000), print_fn=self.log)
             self.dump_buffer_manager(wi1.buffer_mgr, kread, read)
-            #self.log(f"  unk_emptybuf @ {wi1.unk_emptybuf_addr:#x}:")
-            #chexdump(kread(wi1.unk_emptybuf_addr, 0x1000), print_fn=self.log)
-            #self.log(f"  tvb_addr @ {wi1.tvb_addr:#x}:")
-            #chexdump(read(wi0.tvb_addr, 0x1000), print_fn=self.log)
+            # self.log(f"  unk_emptybuf @ {wi1.unk_emptybuf_addr:#x}:")
+            # chexdump(kread(wi1.unk_emptybuf_addr, 0x1000), print_fn=self.log)
+            # self.log(f"  tvb_addr @ {wi1.tvb_addr:#x}:")
+            # chexdump(read(wi0.tvb_addr, 0x1000), print_fn=self.log)
 
             s2 = getattr(wi1, "struct_2", None)
             if s2 is not None:
                 if self.agxdecode:
                     self.log("Decode Load pipeline")
                     self.uat.invalidate_cache()
-                    self.agxdecode.libagxdecode_usc(s2.clear_pipeline.address & ~0xf,
-                                                    b"Load pipeline", True)
+                    self.agxdecode.libagxdecode_usc(
+                        s2.clear_pipeline.address & ~0xF, b"Load pipeline", True
+                    )
             #
             # self.log(f"      depth @ {s2.depth_buffer_ptr2:#x}:")
             # data = read(s2.depth_buffer_ptr2, 0x100000)
@@ -1138,8 +1224,9 @@ class AGXTracer(ASCTracer):
                 if self.agxdecode:
                     self.log("Decode Store pipeline")
                     self.uat.invalidate_cache()
-                    self.agxdecode.libagxdecode_usc(s1.store_pipeline_addr & ~0xf,
-                                                    b"Store pipeline", True)
+                    self.agxdecode.libagxdecode_usc(
+                        s1.store_pipeline_addr & ~0xF, b"Store pipeline", True
+                    )
 
             regs = getattr(wi1, "registers", None)
             if regs is not None:
@@ -1148,14 +1235,16 @@ class AGXTracer(ASCTracer):
                         if self.agxdecode:
                             self.log("Decode Load pipeline")
                             self.uat.invalidate_cache()
-                            self.agxdecode.libagxdecode_usc(reg.data & ~0xf, b"Load pipeline", True)
+                            self.agxdecode.libagxdecode_usc(
+                                reg.data & ~0xF, b"Load pipeline", True
+                            )
                     elif reg.number == 0x15381:
                         if self.agxdecode:
                             self.log("Decode Store pipeline")
                             self.uat.invalidate_cache()
-                            self.agxdecode.libagxdecode_usc(reg.data & ~0xf, b"Store pipeline", True)
-
-
+                            self.agxdecode.libagxdecode_usc(
+                                reg.data & ~0xF, b"Store pipeline", True
+                            )
 
     def handle_compute(self, wi):
         self.log("Got Compute Work Item")
@@ -1163,8 +1252,8 @@ class AGXTracer(ASCTracer):
 
         if wi.cmd.magic == 4:
             wi4 = wi.cmd
-            #self.log(f" completion_buf @ {wi4.completion_buf_addr:#x}: {wi4.completion_buf!s} ")
-            #chexdump(kread(wi4.completion_buf_addr, 0x1000), print_fn=self.log)
+            # self.log(f" completion_buf @ {wi4.completion_buf_addr:#x}: {wi4.completion_buf!s} ")
+            # chexdump(kread(wi4.completion_buf_addr, 0x1000), print_fn=self.log)
         elif wi.cmd.magic == 3:
 
             wi3 = wi.cmd
@@ -1185,7 +1274,7 @@ class AGXTracer(ASCTracer):
             self.log(f" context_id = {context:#x}")
 
             self.log(" high page:")
-            chexdump(read(0x6fffff8000, 0x4000), print_fn=self.log)
+            chexdump(read(0x6FFFFF8000, 0x4000), print_fn=self.log)
 
             if getattr(wi3, "compute_info", None):
                 ci = wi3.compute_info
@@ -1195,7 +1284,9 @@ class AGXTracer(ASCTracer):
                 chexdump(read(ci.iogpu_deflake_1, 0x8000), print_fn=self.log)
 
                 if ci.helper_arg != 0:
-                    layout = HelperArg.parse_stream(self.get_stream(context, ci.helper_arg))
+                    layout = HelperArg.parse_stream(
+                        self.get_stream(context, ci.helper_arg)
+                    )
                     self.log(f" Layout:")
                     self.log(f"   core_stride: {layout.core_stride:#x}")
                     self.log(f"   alloc_size_map: {layout.alloc_size_map}")
@@ -1209,10 +1300,20 @@ class AGXTracer(ASCTracer):
                     max_bucket = max(avail_buckets)
 
                     for core in range(max_cores):
-                        core_base = ci.helper_arg + HelperArg.sizeof() + layout.core_stride * 4 * core
-                        layout = HelperArg.parse_stream(self.get_stream(context, ci.helper_arg))
-                        counts = Array(buckets, Int32ul).parse_stream(self.get_stream(context, core_base))
-                        sg_buffers = Array(max_bucket + 1, SubBufferList).parse_stream(self.get_stream(context, core_base + buckets * 4))
+                        core_base = (
+                            ci.helper_arg
+                            + HelperArg.sizeof()
+                            + layout.core_stride * 4 * core
+                        )
+                        layout = HelperArg.parse_stream(
+                            self.get_stream(context, ci.helper_arg)
+                        )
+                        counts = Array(buckets, Int32ul).parse_stream(
+                            self.get_stream(context, core_base)
+                        )
+                        sg_buffers = Array(max_bucket + 1, SubBufferList).parse_stream(
+                            self.get_stream(context, core_base + buckets * 4)
+                        )
                         self.log(f"   Core {core}")
                         for bucket in avail_buckets:
                             max_sg = layout.max_subgroups[bucket]
@@ -1232,15 +1333,19 @@ class AGXTracer(ASCTracer):
                                     block_size = 0x400 << (2 * (bits - 1))
                                     s = [((i & mask) << 8) for i in row if i & 1]
 
-                                    self.log(f"       [{i:3d}] block={block_size:#x} | {' '.join(map(hex, s))}")
+                                    self.log(
+                                        f"       [{i:3d}] block={block_size:#x} | {' '.join(map(hex, s))}"
+                                    )
                                     for j, block in enumerate(s):
                                         self.log(f"         Block {j}")
-                                        chexdump(read(block, block_size), print_fn=self.log)
+                                        chexdump(
+                                            read(block, block_size), print_fn=self.log
+                                        )
 
             regs = getattr(wi3, "registers", None)
             if regs is not None:
                 for reg in regs:
-                    if reg.number == 0x1a420: # encoder
+                    if reg.number == 0x1A420:  # encoder
                         self.log(f"      encoder @ {reg.data:#x}:")
                         data = read(reg.data, 0x4000)
                         chexdump(data, print_fn=self.log)
@@ -1255,7 +1360,7 @@ class AGXTracer(ASCTracer):
     def ignore(self, addr=None):
         if addr is None:
             addr = self.last_msg.cmdqueue_addr
-        self.ignorelist += [addr & 0xfff_ffffffff]
+        self.ignorelist += [addr & 0xFFF_FFFFFFFF]
 
     def kick(self, val):
         if not self.state.active:
@@ -1264,14 +1369,14 @@ class AGXTracer(ASCTracer):
         self.log(f"kick~! {val:#x}")
         self.mon.poll()
 
-        if val == 0x10: # Kick Firmware
+        if val == 0x10:  # Kick Firmware
             self.log("KickFirmware, polling")
             self.uat.invalidate_cache()
             for chan in self.channels:
                 chan.poll()
             return
 
-        if val == 0x11: # Device Control
+        if val == 0x11:  # Device Control
             channel = 12
             self.uat.invalidate_cache()
 
@@ -1283,15 +1388,15 @@ class AGXTracer(ASCTracer):
             self.uat.invalidate_cache()
 
         else:
-            raise(Exception("Unknown kick type"))
+            raise (Exception("Unknown kick type"))
 
         self.channels[channel].poll()
 
         ## if val not in [0x0, 0x1, 0x10, 0x11]:
-        #if self.last_msg and isinstance(self.last_msg, (RunCmdQueue, DeviceControl_17)):
-            #self.hv.run_shell()
+        # if self.last_msg and isinstance(self.last_msg, (RunCmdQueue, DeviceControl_17)):
+        # self.hv.run_shell()
 
-            #self.last_msg = None
+        # self.last_msg = None
 
         # check the gfx -> cpu channels
         for chan in self.channels[13:]:
@@ -1304,10 +1409,10 @@ class AGXTracer(ASCTracer):
         self.log(f"FW Kick~! {val:#x}")
         self.mon.poll()
 
-        if val == 0x00: # Kick FW control
+        if val == 0x00:  # Kick FW control
             channel = len(self.channels) - 1
         else:
-            raise(Exception("Unknown kick type"))
+            raise (Exception("Unknown kick type"))
 
         self.channels[channel].poll()
 
@@ -1319,7 +1424,7 @@ class AGXTracer(ASCTracer):
         if not self.state.active:
             return
 
-        self.log("pong~!");
+        self.log("pong~!")
         self.mon.poll()
 
         # check the gfx -> cpu channels
@@ -1327,21 +1432,26 @@ class AGXTracer(ASCTracer):
             chan.poll()
 
     def trace_uatrange(self, ctx, start, size, name=None, off=0):
-        start &= 0xfff_ffffffff
+        start &= 0xFFF_FFFFFFFF
         ranges = self.uat.iotranslate(ctx, start, size)
         iova = start
         for range in ranges:
             pstart, psize = range
             if pstart:
-                self.log(f"trace {name} {start:#x}/{iova:#x} [{pstart:#x}:{psize:#x}] +{off:#x}")
-                self.hv.add_tracer(irange(pstart, psize), f"GPUVM",
-                           mode=TraceMode.ASYNC,
-                           read=self.event_gpuvm,
-                           write=self.event_gpuvm,
-                           iova=iova,
-                           paddr=pstart,
-                           name=name,
-                           base=start - off)
+                self.log(
+                    f"trace {name} {start:#x}/{iova:#x} [{pstart:#x}:{psize:#x}] +{off:#x}"
+                )
+                self.hv.add_tracer(
+                    irange(pstart, psize),
+                    f"GPUVM",
+                    mode=TraceMode.ASYNC,
+                    read=self.event_gpuvm,
+                    write=self.event_gpuvm,
+                    iova=iova,
+                    paddr=pstart,
+                    name=name,
+                    base=start - off,
+                )
             iova += psize
 
     def untrace_uatrange(self, ctx, start, size):
@@ -1352,14 +1462,14 @@ class AGXTracer(ASCTracer):
                 self.hv.del_tracer(irange(start, size), f"GPUVM")
 
     def dump_va(self, ctx):
-        data = b''
+        data = b""
         dataStart = 0
 
         def dump_page(start, end, i, pte, level, sparse):
             if i == 0 or sparse:
                 if len(data):
                     chexdump32(data, dataStart)
-                data = b''
+                data = b""
                 dataStart = 0
             if MemoryAttr(pte.AttrIndex) != MemoryAttr.Device and pte.OS:
                 if dataStart == 0:
@@ -1383,12 +1493,12 @@ class AGXTracer(ASCTracer):
     def init_channels(self):
         if self.channels:
             return
-        #self.channels = []
+        # self.channels = []
         for i, chan_info in enumerate(self.state.channel_info):
             print(channelNames[i], chan_info)
-            if channelNames[i] == "Stats": # ignore stats
+            if channelNames[i] == "Stats":  # ignore stats
                 continue
-            elif channelNames[i] == "KTrace": # ignore KTrace
+            elif channelNames[i] == "KTrace":  # ignore KTrace
                 continue
             elif channelNames[i] == "FWCtl":
                 channel_chan = FWCtlChannelTracer(self, chan_info, i)
@@ -1411,8 +1521,8 @@ class AGXTracer(ASCTracer):
         for info_addr in self.state.queues:
             self.state.queues[info_addr].rptr = None
         self.untrace_uatrange(0, self.state.initdata.regionA_addr, 0x4000)
-        self.untrace_uatrange(0, self.state.initdata.regionB_addr, 0x6bc0)
-        self.untrace_uatrange(0, self.state.initdata.regionC_addr, 0x11d40)
+        self.untrace_uatrange(0, self.state.initdata.regionB_addr, 0x6BC0)
+        self.untrace_uatrange(0, self.state.initdata.regionC_addr, 0x11D40)
 
     def resume(self):
         self.uat.invalidate_cache()
@@ -1430,32 +1540,37 @@ class AGXTracer(ASCTracer):
         for queue in self.cmdqueues.values():
             queue.set_active(True)
         self.trace_uatrange(0, self.state.initdata.regionA_addr, 0x4000, name="regionA")
-        self.trace_uatrange(0, self.state.initdata.regionB_addr, 0x6bc0, name="regionB")
-        #self.trace_uatrange(0, self.state.initdata.regionC_addr, 0x11d40, name="regionC")
-        self.trace_uatrange(0, self.state.initdata.regionB.buffer_mgr_ctl_addr, 0x4000, name="Buffer manager ctl")
+        self.trace_uatrange(0, self.state.initdata.regionB_addr, 0x6BC0, name="regionB")
+        # self.trace_uatrange(0, self.state.initdata.regionC_addr, 0x11d40, name="regionC")
+        self.trace_uatrange(
+            0,
+            self.state.initdata.regionB.buffer_mgr_ctl_addr,
+            0x4000,
+            name="Buffer manager ctl",
+        )
 
     def add_mon_regions(self):
         return
         initdata = self.state.initdata
         if initdata is not None:
             self.mon_addva(0, initdata.regionA_addr, 0x4000, "RegionA")
-            self.mon_addva(0, initdata.regionB_addr, 0x6bc0, "RegionB")
-            self.mon_addva(0, initdata.regionC_addr, 0x11d40, "RegionC")
-            #self.mon_addva(0, initdata.regionB.unkptr_170, 0xc0, "unkptr_170")
-            #self.mon_addva(0, initdata.regionB.unkptr_178, 0x1c0, "unkptr_178")
-            #self.mon_addva(0, initdata.regionB.unkptr_180, 0x140, "unkptr_180")
+            self.mon_addva(0, initdata.regionB_addr, 0x6BC0, "RegionB")
+            self.mon_addva(0, initdata.regionC_addr, 0x11D40, "RegionC")
+            # self.mon_addva(0, initdata.regionB.unkptr_170, 0xc0, "unkptr_170")
+            # self.mon_addva(0, initdata.regionB.unkptr_178, 0x1c0, "unkptr_178")
+            # self.mon_addva(0, initdata.regionB.unkptr_180, 0x140, "unkptr_180")
             self.mon_addva(0, initdata.regionB.unkptr_190, 0x80, "unkptr_190")
-            self.mon_addva(0, initdata.regionB.unkptr_198, 0xc0, "unkptr_198")
+            self.mon_addva(0, initdata.regionB.unkptr_198, 0xC0, "unkptr_198")
             # self.mon_addva(0, initdata.regionB.buffer_mgr_ctl_addr, 0x4000, "Buffer manager ctl")
-            #self.mon_addva(0, initdata.unkptr_20.unkptr_0, 0x40, "unkptr_20.unkptr_0")
-            #self.mon_addva(0, initdata.unkptr_20.unkptr_8, 0x40, "unkptr_20.unkptr_8")
+            # self.mon_addva(0, initdata.unkptr_20.unkptr_0, 0x40, "unkptr_20.unkptr_0")
+            # self.mon_addva(0, initdata.unkptr_20.unkptr_8, 0x40, "unkptr_20.unkptr_8")
 
     def clear_gpuvm_range(self, ctx, iova, length):
         while length > 0:
-            page = iova & ~0x3fff
-            off = iova & 0x3fff
+            page = iova & ~0x3FFF
+            off = iova & 0x3FFF
             block = min(0x4000 - off, length)
-            page &= 0xfffffffffff
+            page &= 0xFFFFFFFFFFF
             print(f"Clear {ctx} {page:#x} {block:#x}")
             paddr = self.va_to_pa.get((ctx, page), None)
             if paddr:
@@ -1469,19 +1584,19 @@ class AGXTracer(ASCTracer):
             return
 
         self.clear_gpuvm_range(
-            0,
-            self.state.initdata.regionB.channels.Stats.state_addr,
-            0x30)
+            0, self.state.initdata.regionB.channels.Stats.state_addr, 0x30
+        )
         self.clear_gpuvm_range(
             0,
             self.state.initdata.regionB.channels.Stats.ringbuffer_addr,
-            0x100 * StatsSize)
+            0x100 * StatsSize,
+        )
 
     def pong_init(self, addr):
         self.log("UAT at init time:")
         self.uat.invalidate_cache()
         self.uat.dump(0, log=self.log)
-        addr |= 0xfffff000_00000000
+        addr |= 0xFFFFF000_00000000
         initdata = InitData.parse_stream(self.get_stream(0, addr))
 
         self.log("Initdata:")
@@ -1490,7 +1605,7 @@ class AGXTracer(ASCTracer):
         self.add_mon_regions()
         self.clear_stats_tracers()
 
-        #self.initdata.regionB.mon(lambda addr, size, name: self.mon_addva(0, addr, size, name))
+        # self.initdata.regionB.mon(lambda addr, size, name: self.mon_addva(0, addr, size, name))
 
         self.state.initdata_addr = addr
         self.state.initdata = initdata
@@ -1526,5 +1641,6 @@ class AGXTracer(ASCTracer):
             self.after_init_hook()
         if self.shell_after_init:
             self.hv.run_shell()
+
 
 ChannelTracer = ChannelTracer._reloadcls()

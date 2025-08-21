@@ -1,13 +1,19 @@
 # SPDX-License-Identifier: MIT
-from construct import *
 from enum import IntEnum
+
+from construct import *
 
 from ..utils import *
 
 __all__ = [
-    "MMIOTraceFlags", "EvtMMIOTrace", "EvtIRQTrace", "HV_EVENT",
-    "VMProxyHookData", "TraceMode",
+    "MMIOTraceFlags",
+    "EvtMMIOTrace",
+    "EvtIRQTrace",
+    "HV_EVENT",
+    "VMProxyHookData",
+    "TraceMode",
 ]
+
 
 class MMIOTraceFlags(Register32):
     ATTR = 31, 24
@@ -16,6 +22,7 @@ class MMIOTraceFlags(Register32):
     WIDTH = 4, 0
     WRITE = 5
     MULTI = 6
+
 
 EvtMMIOTrace = Struct(
     "flags" / RegAdapter(MMIOTraceFlags),
@@ -31,6 +38,7 @@ EvtIRQTrace = Struct(
     "num" / Int16ul,
 )
 
+
 class HV_EVENT(IntEnum):
     HOOK_VM = 1
     VTIMER = 2
@@ -40,6 +48,7 @@ class HV_EVENT(IntEnum):
     VIRTIO = 6
     PANIC = 7
 
+
 VMProxyHookData = Struct(
     "flags" / RegAdapter(MMIOTraceFlags),
     "id" / Int32ul,
@@ -47,9 +56,10 @@ VMProxyHookData = Struct(
     "data" / Array(8, Hex(Int64ul)),
 )
 
+
 class TraceMode(IntEnum):
-    '''
-Different types of Tracing '''
+    """
+    Different types of Tracing"""
 
     OFF = 0
     BYPASS = 1

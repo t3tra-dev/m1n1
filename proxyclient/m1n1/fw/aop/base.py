@@ -1,15 +1,23 @@
 # SPDX-License-Identifier: MIT
 import struct
-from construct import *
 from copy import deepcopy
 
-def round_up(x, y): return ((x + (y - 1)) & (-y))
-def round_down(x, y): return (x - (x % y))
+from construct import *
+
+
+def round_up(x, y):
+    return (x + (y - 1)) & (-y)
+
+
+def round_down(x, y):
+    return x - (x % y)
+
 
 AOPBootargsItem = Struct(
     "key" / PaddedString(4, "utf8"),
     "size" / Int32ul,
 )
+
 
 class AOPBootargs:
     def __init__(self, bytes_):
@@ -20,32 +28,32 @@ class AOPBootargs:
         off = 0
         fields = []
         while off < len(blob):
-            item = AOPBootargsItem.parse(blob[off:off+AOPBootargsItem.sizeof()])
+            item = AOPBootargsItem.parse(blob[off : off + AOPBootargsItem.sizeof()])
             off += AOPBootargsItem.sizeof()
             fields.append((item.key, (off, item.size)))
             off += item.size
         if off > len(blob):
-            raise ValueError('blob overran during parsing')
+            raise ValueError("blob overran during parsing")
         return dict(fields)
 
     def items(self):
         for key, span in self.index.items():
             off, length = span
-            yield key, self.blob[off:off + length]
+            yield key, self.blob[off : off + length]
 
     def __getitem__(self, key):
         off, length = self.index[key]
-        return bytes(self.blob[off:off + length])
+        return bytes(self.blob[off : off + length])
 
     def __setitem__(self, key, value):
         off, length = self.index[key]
         if type(value) is int:
-            value = int.to_bytes(value, length, byteorder='little')
+            value = int.to_bytes(value, length, byteorder="little")
         elif type(value) is str:
-            value = value.encode('ascii')
+            value = value.encode("ascii")
         if len(value) > length:
-            raise ValueError(f'field {key:s} overflown')
-        self.blob[off:off + length] = value
+            raise ValueError(f"field {key:s} overflown")
+        self.blob[off : off + length] = value
 
     def update(self, keyvals):
         for key, val in keyvals.items():
@@ -66,6 +74,7 @@ class AOPBootargs:
 
     def to_bytes(self):
         return bytes(self.blob)
+
 
 class AOPBase:
     def __init__(self, u):
@@ -88,8 +97,8 @@ class AOPBase:
         [cpu1] MMIO: W.4   0x24acb0280 (aop[2], offset 0xb0280) = 0x10000
         [cpu1] MMIO: W.4   0x24acb0284 (aop[2], offset 0xb0284) = 0x0 // end of bootargs
         """
-        offset = self.u.proxy.read32(self.nub_base + 0x22c) # 0x224 in 12.3
-        size = self.u.proxy.read32(self.nub_base + 0x230) # 0x228 in 12.3
+        offset = self.u.proxy.read32(self.nub_base + 0x22C)  # 0x224 in 12.3
+        size = self.u.proxy.read32(self.nub_base + 0x230)  # 0x228 in 12.3
         return (self.nub_base + offset, size)
 
     def read_bootargs(self):

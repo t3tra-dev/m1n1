@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: MIT
 
+from ..hv import TraceMode
 from ..hw.dart import *
 from ..hw.dart8020 import *
 from ..hw.dart8110 import *
-from ..hv import TraceMode
 from ..utils import *
 from . import ADTDevTracer
+
 
 class DARTTracer(ADTDevTracer):
 
@@ -53,7 +54,6 @@ class DARTTracer(ADTDevTracer):
 
         self.dart = DART(self.hv.iface, self.regs, compat=self.dev.compatible[0])
 
-
     def w_STREAM_COMMAND(self, stream_command):
         if stream_command.INVALIDATE:
             self.log(f"Invalidate Stream: {self.regs.cached.STREAM_SELECT.reg}")
@@ -78,10 +78,14 @@ class DARTTracer(ADTDevTracer):
             if pa is not None:
                 pzone = irange(pa, size)
                 self.page_map[pzone] = (pa, va)
-                self.hv.add_tracer(pzone, "DARTVATracer", mode,
-                                   self.event_va if read else None,
-                                   self.event_va if write else None,
-                                   stream = stream)
+                self.hv.add_tracer(
+                    pzone,
+                    "DARTVATracer",
+                    mode,
+                    self.event_va if read else None,
+                    self.event_va if write else None,
+                    stream=stream,
+                )
             va += size
 
     def event_va(self, evt, stream=None):
@@ -92,6 +96,8 @@ class DARTTracer(ADTDevTracer):
             addr = f"{evt.addr - pabase + vabase:#x}"
         t = "W" if evt.flags.WRITE else "R"
         m = "+" if evt.flags.MULTI else " "
-        logline = (f"[cpu{evt.flags.CPU}] [0x{evt.pc:016x}] IOVA/{stream}: {t}.{1<<evt.flags.WIDTH:<2}{m} " +
-                   f"{addr} (0x{evt.addr:x}) = 0x{evt.data:x}")
+        logline = (
+            f"[cpu{evt.flags.CPU}] [0x{evt.pc:016x}] IOVA/{stream}: {t}.{1<<evt.flags.WIDTH:<2}{m} "
+            + f"{addr} (0x{evt.addr:x}) = 0x{evt.data:x}"
+        )
         self.hv.log(logline, show_cpu=False)

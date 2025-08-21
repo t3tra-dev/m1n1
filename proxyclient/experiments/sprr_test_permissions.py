@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 from contextlib import contextmanager
 
-from m1n1.setup import *
 from m1n1.find_regs import *
+from m1n1.setup import *
+
 from m1n1 import asm
 
 p.smp_start_secondaries()
+
 
 class ARMPageTable:
     PAGESIZE = 0x4000
@@ -19,12 +23,14 @@ class ARMPageTable:
         self.free = free
 
         self.l0 = self.memalign(self.PAGESIZE, self.PAGESIZE)
-        self.l1 = [self.memalign(self.PAGESIZE, self.PAGESIZE), self.memalign(
-            self.PAGESIZE, self.PAGESIZE)]
+        self.l1 = [
+            self.memalign(self.PAGESIZE, self.PAGESIZE),
+            self.memalign(self.PAGESIZE, self.PAGESIZE),
+        ]
         self.l2 = {}
 
         p.write64(self.l0, self.make_table_pte(self.l1[0]))
-        p.write64(self.l0+8, self.make_table_pte(self.l1[1]))
+        p.write64(self.l0 + 8, self.make_table_pte(self.l1[1]))
 
     def make_table_pte(self, addr):
         # table mapping, access bit set
@@ -33,7 +39,7 @@ class ARMPageTable:
     def map_page(self, vaddr, paddr, access_bits):
         ap = (access_bits & 0b1100) >> 2
         pxn = (access_bits & 0b0010) >> 1
-        uxn = (access_bits & 0b0001)
+        uxn = access_bits & 0b0001
 
         # block mapping, access bit set
         pte = paddr | 0b01 | (1 << 10)
@@ -43,17 +49,17 @@ class ARMPageTable:
         pte |= pxn << 54
         pte |= uxn << 53
 
-        l0_idx = (vaddr >> (25+11+11)) & 1
-        l1_idx = (vaddr >> (25+11)) & 0x7ff
-        l2_idx = (vaddr >> 25) & 0x7ff
+        l0_idx = (vaddr >> (25 + 11 + 11)) & 1
+        l1_idx = (vaddr >> (25 + 11)) & 0x7FF
+        l2_idx = (vaddr >> 25) & 0x7FF
 
         tbl = self.l2.get((l0_idx, l1_idx), None)
         if not tbl:
             tbl = self.memalign(self.PAGESIZE, self.PAGESIZE)
             self.l2[(l0_idx, l1_idx)] = tbl
-            p.write64(self.l1[l0_idx] + 8*l1_idx, self.make_table_pte(tbl))
+            p.write64(self.l1[l0_idx] + 8 * l1_idx, self.make_table_pte(tbl))
 
-        p.write64(tbl + 8*l2_idx, pte)
+        p.write64(tbl + 8 * l2_idx, pte)
 
     def map(self, vaddr, paddr, sz, access_bits):
         assert sz % 0x2000000 == 0
@@ -81,13 +87,15 @@ def setup_exception_vectors(heap, gxf=False):
     if gxf:
         elr = "S3_6_C15_C10_6"
         eret = ".long 0x201400"
-        indicator = 0xf2
+        indicator = 0xF2
     else:
         elr = "ELR_EL1"
         eret = "eret"
-        indicator = 0xf0
+        indicator = 0xF0
 
-    return build_and_write_code(heap, """
+    return build_and_write_code(
+        heap,
+        """
                 .rept   16
                 b 1f
                 .align 7
@@ -110,21 +118,26 @@ def setup_exception_vectors(heap, gxf=False):
 
                 isb
                 {eret}
-        """.format(eret=eret, elr=elr, indicator=indicator))
+        """.format(
+            eret=eret, elr=elr, indicator=indicator
+        ),
+    )
 
 
 print("Setting up..")
 pagetable = ARMPageTable(u.memalign, u.free)
-pagetable.map(0x800000000, 0x800000000, 0xc00000000, 0)
-pagetable.map(0xf800000000, 0x800000000, 0xc00000000, 1)
+pagetable.map(0x800000000, 0x800000000, 0xC00000000, 0)
+pagetable.map(0xF800000000, 0x800000000, 0xC00000000, 1)
 
 el2_vectors = setup_exception_vectors(u.heap, gxf=False)
 gl2_vectors = setup_exception_vectors(u.heap, gxf=True)
 
 probe_page = build_and_write_code(u.heap, "mov x10, 0x80\nret\nret\nret\n")
-probe_page_vaddr = probe_page | 0xf000000000
+probe_page_vaddr = probe_page | 0xF000000000
 
-code_page = build_and_write_code(u.heap, """
+code_page = build_and_write_code(
+    u.heap,
+    """
             #define SPRR_PERM_EL0  S3_6_C15_C1_5
             #define SPRR_PERM_EL1  S3_6_C15_C1_6
             #define SPRR_PERM_EL2  S3_6_C15_C1_7
@@ -346,21 +359,30 @@ code_page = build_and_write_code(u.heap, """
 
                     isb
                     gexit
-    """.format(ttbr=pagetable.l0, vectors=el2_vectors, probe_page=probe_page_vaddr, gxf_vectors=gl2_vectors))
+    """.format(
+        ttbr=pagetable.l0,
+        vectors=el2_vectors,
+        probe_page=probe_page_vaddr,
+        gxf_vectors=gl2_vectors,
+    ),
+)
 
 print("Running code now...")
 for i in range(0x10):
-    sprr_val = 0x5 | ((i & 0xf) << 4)
+    sprr_val = 0x5 | ((i & 0xF) << 4)
     ret = p.smp_call_sync(1, code_page, sprr_val)
 
     glret = ret >> 24
-    glx = 'x' if (glret >> 16) & 0xff == 0x80 else '-'
-    glr = 'r' if (glret >> 8) & 0xff == 0x80 else '-'
-    glw = 'w' if glret & 0xff == 0x80 else '-'
+    glx = "x" if (glret >> 16) & 0xFF == 0x80 else "-"
+    glr = "r" if (glret >> 8) & 0xFF == 0x80 else "-"
+    glw = "w" if glret & 0xFF == 0x80 else "-"
 
-    x = 'x' if (ret >> 16) & 0xff == 0x80 else '-'
-    r = 'r' if (ret >> 8) & 0xff == 0x80 else '-'
-    w = 'w' if ret & 0xff == 0x80 else '-'
+    x = "x" if (ret >> 16) & 0xFF == 0x80 else "-"
+    r = "r" if (ret >> 8) & 0xFF == 0x80 else "-"
+    w = "w" if ret & 0xFF == 0x80 else "-"
 
-    print("SPRR: {0:04b} result: {1:x} GL: {2}{3}{4} EL: {5}{6}{7}".format(
-        i, ret, glr, glw, glx, r, w, x))
+    print(
+        "SPRR: {0:04b} result: {1:x} GL: {2}{3}{4} EL: {5}{6}{7}".format(
+            i, ret, glr, glw, glx, r, w, x
+        )
+    )

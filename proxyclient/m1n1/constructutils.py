@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import inspect, textwrap, json, re, sys, os
+import inspect
+import json
+import os
+import re
+import sys
+import textwrap
 
 from construct import *
 from construct.core import evaluate
 from construct.lib import HexDisplayedInteger
+
 from .utils import *
 
 g_struct_trace = set()
 g_struct_addrmap = {}
 g_depth = 0
 
+
 def ZPadding(size):
     return Const(bytes(size), Bytes(size))
+
 
 def recursive_reload(obj, token=None):
     global g_depth
@@ -26,24 +34,24 @@ def recursive_reload(obj, token=None):
         return
 
     g_depth += 1
-    #print("  " * g_depth + f"> {obj}", id(obj), id(token))
-    if isinstance(obj, Construct) and hasattr(obj, 'subcon'):
+    # print("  " * g_depth + f"> {obj}", id(obj), id(token))
+    if isinstance(obj, Construct) and hasattr(obj, "subcon"):
         # Single subcon types
         if inspect.isclass(obj.subcon):
-            #print("> isclass")
+            # print("> isclass")
             if hasattr(obj.subcon, "_reloadcls"):
-                #print("> Recursive (subcon)")
+                # print("> Recursive (subcon)")
                 obj.subcon = obj.subcon._reloadcls(token=token)
         else:
             if isinstance(obj.subcon, Construct):
                 recursive_reload(obj.subcon, token)
-    if isinstance(obj, Construct) and hasattr(obj, 'subcons'):
+    if isinstance(obj, Construct) and hasattr(obj, "subcons"):
         # Construct types that have lists
         new_subcons = []
         for i, item in enumerate(obj.subcons):
             if inspect.isclass(item):
                 if hasattr(item, "_reloadcls"):
-                    #print("> Recursive (subcons)")
+                    # print("> Recursive (subcons)")
                     item = item._reloadcls()
             else:
                 if isinstance(item, Construct):
@@ -51,12 +59,12 @@ def recursive_reload(obj, token=None):
             new_subcons.append(item)
             obj.subcons = new_subcons
 
-    if isinstance(obj, Construct) and hasattr(obj, 'cases'):
+    if isinstance(obj, Construct) and hasattr(obj, "cases"):
         # Construct types that have lists
         for i, item in list(obj.cases.items()):
             if inspect.isclass(item):
                 if hasattr(item, "_reloadcls"):
-                    #print("> Recursive (cases)")
+                    # print("> Recursive (cases)")
                     obj.cases[i] = item._reloadcls(token=token)
             else:
                 if isinstance(item, Construct):
@@ -66,7 +74,7 @@ def recursive_reload(obj, token=None):
         value = getattr(obj, field)
         if inspect.isclass(value):
             if hasattr(value, "_reloadcls"):
-                #print("> Recursive (value)")
+                # print("> Recursive (value)")
                 setattr(obj, field, value._reloadcls(token=token))
         else:
             if isinstance(value, Construct):
@@ -75,6 +83,7 @@ def recursive_reload(obj, token=None):
     obj._token = token
 
     g_depth -= 1
+
 
 def str_value(value, repr=False):
     if isinstance(value, bytes) and value == bytes(len(value)):
@@ -99,17 +108,21 @@ def str_value(value, repr=False):
         else:
             sv = ["[\n"]
             for off in range(0, len(value), 16):
-                sv.append("  " + ", ".join(map(str_value, value[off:off+16])) + ",\n")
+                sv.append(
+                    "  " + ", ".join(map(str_value, value[off : off + 16])) + ",\n"
+                )
             sv.append(f"{om}]\n")
             return "".join(sv)
 
     return str(value)
+
 
 class DecDisplayedInteger(int):
     @staticmethod
     def new(intvalue):
         obj = DecDisplayedInteger(intvalue)
         return obj
+
 
 class Dec(Adapter):
     def _decode(self, obj, context, path):
@@ -136,6 +149,7 @@ class Dec(Adapter):
     def _emitfulltype(self, ksy, bitwise):
         return self.subcon._compilefulltype(ksy, bitwise)
 
+
 class ConstructClassException(Exception):
     pass
 
@@ -149,7 +163,7 @@ class ReloadableConstructMeta(ReloadableMeta, Construct):
         if cls.SHORT_NAME is not None:
             cls.short_name = cls.SHORT_NAME
         else:
-            cls.short_name = re.sub('[a-z]', '', cls.name)
+            cls.short_name = re.sub("[a-z]", "", cls.name)
             if len(cls.short_name) > 5:
                 cls.short_name = cls.short_name[:3] + cls.short_name[-2:]
 
@@ -186,26 +200,28 @@ class ReloadableConstructMeta(ReloadableMeta, Construct):
                 off += sizeof
         return cls
 
+
 class ConstructClassBase(Reloadable, metaclass=ReloadableConstructMeta):
-    """ Offers two benefits over regular construct
+    """Offers two benefits over regular construct
 
-        1. It's reloadable, and can recursively reload other referenced ConstructClasses
-        2. It's a class, so you can define methods
+    1. It's reloadable, and can recursively reload other referenced ConstructClasses
+    2. It's a class, so you can define methods
 
-        Currently only supports parsing, but could be extended to support building
+    Currently only supports parsing, but could be extended to support building
 
-        Example:
-            Instead of:
-            MyStruct = Struct(
+    Example:
+        Instead of:
+        MyStruct = Struct(
+            "field1" / Int32ul
+        )
+
+        class MyClass(ConstructClass):
+            subcon = Struct(
                 "field1" / Int32ul
             )
 
-            class MyClass(ConstructClass):
-                subcon = Struct(
-                    "field1" / Int32ul
-                )
-
     """
+
     SHORT_NAME = None
 
     parsed = None
@@ -232,12 +248,12 @@ class ConstructClassBase(Reloadable, metaclass=ReloadableConstructMeta):
             dict = kwargs
 
         for key in dict:
-            if not key.startswith('_'):
+            if not key.startswith("_"):
                 setattr(self, key, dict[key])
                 self._keys += [key]
 
     def set_addr(self, addr=None, stream=None):
-        #print("set_addr", type(self), addr)
+        # print("set_addr", type(self), addr)
         if addr is not None:
             self._addr = addr
         self._set_meta(self, stream)
@@ -273,7 +289,7 @@ class ConstructClassBase(Reloadable, metaclass=ReloadableConstructMeta):
 
     @classmethod
     def _reloadcls(cls, force=False, token=None):
-        #print(f"_reloadcls({cls})", id(cls))
+        # print(f"_reloadcls({cls})", id(cls))
         newcls = Reloadable._reloadcls.__func__(cls, force)
         if hasattr(newcls, "subcon"):
             recursive_reload(newcls.subcon, token)
@@ -300,7 +316,7 @@ class ConstructClassBase(Reloadable, metaclass=ReloadableConstructMeta):
                     subcon = subcon.subcon
                 if isinstance(subcon, Renamed):
                     name = subcon.name
-                    #print(name, subcon)
+                    # print(name, subcon)
                     subcon = subcon.subcon
                     if stream is not None and getattr(stream, "meta_fn", None):
                         meta = stream.meta_fn(subaddr, sizeof)
@@ -310,7 +326,7 @@ class ConstructClassBase(Reloadable, metaclass=ReloadableConstructMeta):
                         self._pointers.add(name)
                         continue
                     try:
-                        #print(name, subcon)
+                        # print(name, subcon)
                         val = self[name]
                     except:
                         pass
@@ -328,7 +344,7 @@ class ConstructClassBase(Reloadable, metaclass=ReloadableConstructMeta):
 
     @classmethod
     def _parse(cls, stream, context, path):
-        #print(f"parse {cls} @ {stream.tell():#x} {path}")
+        # print(f"parse {cls} @ {stream.tell():#x} {path}")
         addr = stream.tell()
         obj = cls.subcon._parse(stream, context, path)
         size = stream.tell() - addr
@@ -374,6 +390,7 @@ class ConstructClassBase(Reloadable, metaclass=ReloadableConstructMeta):
 
         return Construct.build(self, obj, **contextkw)
 
+
 class ROPointer(Pointer):
     def _build(self, obj, stream, context, path):
         return obj
@@ -385,34 +402,38 @@ class ROPointer(Pointer):
 
         return Pointer._parse(self, stream, context, path)
 
+
 class ConstructClass(ConstructClassBase, Container):
-    """ Offers two benefits over regular construct
+    """Offers two benefits over regular construct
 
-        1. It's reloadable, and can recursively reload other referenced ConstructClasses
-        2. It's a class, so you can define methods
+    1. It's reloadable, and can recursively reload other referenced ConstructClasses
+    2. It's a class, so you can define methods
 
-        Currently only supports parsing, but could be extended to support building
+    Currently only supports parsing, but could be extended to support building
 
-        Example:
-            Instead of:
-            MyStruct = Struct(
+    Example:
+        Instead of:
+        MyStruct = Struct(
+            "field1" / Int32ul
+        )
+
+        class MyClass(ConstructClass):
+            subcon = Struct(
                 "field1" / Int32ul
             )
-
-            class MyClass(ConstructClass):
-                subcon = Struct(
-                    "field1" / Int32ul
-                )
     """
 
     def diff(self, other, show_all=False):
         return self.__str__(other=other, show_all=show_all)
 
     def __eq__(self, other):
-        return all(self[k] == other[k] for k in self
-                   if (not k.startswith("_"))
-                   and (k not in self._pointers)
-                   and not callable(self[k]))
+        return all(
+            self[k] == other[k]
+            for k in self
+            if (not k.startswith("_"))
+            and (k not in self._pointers)
+            and not callable(self[k])
+        )
 
     def __str__(self, ignore=[], other=None, show_all=False) -> str:
 
@@ -423,7 +444,7 @@ class ConstructClass(ConstructClassBase, Container):
         str += "\n"
 
         keys = list(self)
-        keys.sort(key = lambda x: self._off.get(x, (-1, 0))[0])
+        keys.sort(key=lambda x: self._off.get(x, (-1, 0))[0])
 
         for key in keys:
             if key in self._off:
@@ -431,7 +452,7 @@ class ConstructClass(ConstructClassBase, Container):
                 if offv == -1:
                     # print(key, offv, sizeof)
                     continue
-            if key in ignore or key.startswith('_'):
+            if key in ignore or key.startswith("_"):
                 continue
             value = getattr(self, key)
             need_diff = False
@@ -444,6 +465,7 @@ class ConstructClass(ConstructClassBase, Container):
                 offv, sizeof = self._off[key]
                 if sizeof == 0:
                     continue
+
                 def _valdiff(value, other_value):
                     if hasattr(value, "diff"):
                         return value.diff(other_value)
@@ -451,7 +473,9 @@ class ConstructClass(ConstructClassBase, Container):
                         pad = bytes()
                         if len(value) & 3:
                             pad = bytes(4 - (len(value) & 3))
-                        return chexdiff32(other_value+pad, value+pad, offset=offv, offset2=0)
+                        return chexdiff32(
+                            other_value + pad, value + pad, offset=offv, offset2=0
+                        )
                     else:
                         val_repr = str_value(value)
                         if other_value != value:
@@ -464,7 +488,9 @@ class ConstructClass(ConstructClassBase, Container):
                     for i, (a, b) in enumerate(zip(value, other_value)):
                         if a == b:
                             continue
-                        val_repr += f"[{i}] = " + textwrap.indent(_valdiff(a, b), "    ") + "\n"
+                        val_repr += (
+                            f"[{i}] = " + textwrap.indent(_valdiff(a, b), "    ") + "\n"
+                        )
                         offv += sizeof // len(value)
                     val_repr += "}\n"
                 else:
@@ -483,10 +509,12 @@ class ConstructClass(ConstructClassBase, Container):
                 off = f"\x1b[32m[{offv:3x}.{sizeofs}]\x1b[m "
             if key in self._meta:
                 meta = f" \x1b[34m{self._meta[key]}\x1b[m"
-            if '\n' in val_repr:
-                val_repr = textwrap.indent(val_repr, f'\x1b[90m{self.short_name:>5s}.\x1b[m')
-                if not val_repr.endswith('\n'):
-                    val_repr += '\n'
+            if "\n" in val_repr:
+                val_repr = textwrap.indent(
+                    val_repr, f"\x1b[90m{self.short_name:>5s}.\x1b[m"
+                )
+                if not val_repr.endswith("\n"):
+                    val_repr += "\n"
                 str += f"\x1b[90m{self.short_name:>5s}.{off}\x1b[95m{key}\x1b[m ={meta}\n{val_repr}"
             else:
                 str += f"\x1b[90m{self.short_name:>5s}.{off}\x1b[95m{key}\x1b[m = {val_repr}{meta}\n"
@@ -499,14 +527,13 @@ class ConstructClass(ConstructClassBase, Container):
             print(f"#  Address: 0x{self._addr:x}")
 
         keys = list(self)
-        keys.sort(key = lambda x: self._off.get(x, (-1, 0))[0])
+        keys.sort(key=lambda x: self._off.get(x, (-1, 0))[0])
         for key in keys:
-            if key.startswith('_'):
+            if key.startswith("_"):
                 continue
             value = getattr(self, key)
             val_repr = str_value(value, repr=True)
             print(f"self.{key} = {val_repr}")
-
 
     @classmethod
     def _build_prepare(cls, obj):
@@ -542,15 +569,17 @@ class ConstructClass(ConstructClassBase, Container):
         self = ConstructClassBase._parse.__func__(cls, stream, context, path)
 
         for key in self:
-            if key.startswith('_'):
+            if key.startswith("_"):
                 continue
             try:
                 val = int(self[key])
             except:
                 continue
-            if (0x1000000000 <= val <= 0x1f00000000 or
-                0xf8000000000 <= val <= 0xff000000000 or
-                0xffffff8000000000 <= val <= 0xfffffff000000000):
+            if (
+                0x1000000000 <= val <= 0x1F00000000
+                or 0xF8000000000 <= val <= 0xFF000000000
+                or 0xFFFFFF8000000000 <= val <= 0xFFFFFFF000000000
+            ):
                 g_struct_trace.add((val, f"{cls.name}.{key}"))
         return self
 
@@ -575,7 +604,9 @@ class ConstructClass(ConstructClassBase, Container):
                     continue
 
                 val = obj2[name]
-                if not isinstance(subcon, type) or not issubclass(subcon, ConstructClassBase):
+                if not isinstance(subcon, type) or not issubclass(
+                    subcon, ConstructClassBase
+                ):
                     continue
 
                 def _map(v):
@@ -632,7 +663,11 @@ class ConstructClass(ConstructClassBase, Container):
             while True:
                 try:
                     subcon = subcon.subcon
-                    if isinstance(subcon, type) and issubclass(subcon, ConstructClass) and subcon.is_versioned():
+                    if (
+                        isinstance(subcon, type)
+                        and issubclass(subcon, ConstructClass)
+                        and subcon.is_versioned()
+                    ):
                         return True
                 except:
                     break
@@ -689,7 +724,7 @@ class ConstructClass(ConstructClassBase, Container):
                 subcon = Int8ul
 
             if skip:
-                #s.append(f"    // {name}: {subcon}")
+                # s.append(f"    // {name}: {subcon}")
                 continue
 
             TYPE_MAP = {
@@ -723,11 +758,13 @@ class ConstructClass(ConstructClassBase, Container):
         s += ["}"]
         return "\n".join(s)
 
-class ConstructValueClass(ConstructClassBase):
-    """ Same as Construct, but for subcons that are single values, rather than containers
 
-        the value is stored as .value
+class ConstructValueClass(ConstructClassBase):
+    """Same as Construct, but for subcons that are single values, rather than containers
+
+    the value is stored as .value
     """
+
     HAS_VALUE = True
 
     def __eq__(self, other):
@@ -749,7 +786,9 @@ class ConstructValueClass(ConstructClassBase):
 
     def _apply(self, obj):
         self.value = obj
+
     _apply_classful = _apply
+
 
 class ConstructRegMap(BaseRegMap):
     TYPE_MAP = {
@@ -792,16 +831,30 @@ class ConstructRegMap(BaseRegMap):
             return
         self._accessor[k].val = v
 
+
 class Ver(Subconstruct):
     # Ugly hack to make this survive across reloads...
     try:
         _version = sys.modules["m1n1.constructutils"].Ver._version
     except (KeyError, AttributeError):
-        _version = {"V": os.environ.get("AGX_FWVER", "V12_3"),
-                    "G": os.environ.get("AGX_GPU", "G13")}
+        _version = {
+            "V": os.environ.get("AGX_FWVER", "V12_3"),
+            "G": os.environ.get("AGX_GPU", "G13"),
+        }
 
     MATRIX = {
-        "V": ["V12_1", "V12_3", "V12_4", "V13_0B4", "V13_0B5", "V13_0B6", "V13_2", "V13_3", "V13_5B4", "V13_5"],
+        "V": [
+            "V12_1",
+            "V12_3",
+            "V12_4",
+            "V13_0B4",
+            "V13_0B5",
+            "V13_0B6",
+            "V13_2",
+            "V13_3",
+            "V13_5B4",
+            "V13_5",
+        ],
         "G": ["G13", "G14", "G14X"],
     }
 
@@ -886,8 +939,18 @@ class Ver(Subconstruct):
             gpu = "G14X"
         cls.set_version_key("G", gpu)
 
+
 def show_struct_trace(log=print):
     for addr, desc in sorted(list(g_struct_trace)):
         log(f"{addr:>#18x}: {desc}")
 
-__all__ = ["ConstructClass", "ConstructValueClass", "Dec", "ROPointer", "show_struct_trace", "ZPadding", "Ver"]
+
+__all__ = [
+    "ConstructClass",
+    "ConstructValueClass",
+    "Dec",
+    "ROPointer",
+    "show_struct_trace",
+    "ZPadding",
+    "Ver",
+]

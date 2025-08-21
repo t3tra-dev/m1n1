@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
-from ..utils import *
 from enum import IntEnum
+
+from ..utils import *
 
 
 class R_STATUS(Register32):
@@ -31,8 +32,8 @@ class E_ENCODE_PIXEL_FORMAT(IntEnum):
     YUV10_linear = 1
     RGB888 = 2
     RGB565 = 3
-    YUV_planar = 4      # partially tested, details not understood
-    YUV_linear = 5      # partially tested, details not understood
+    YUV_planar = 4  # partially tested, details not understood
+    YUV_linear = 5  # partially tested, details not understood
 
 
 class R_ENCODE_PIXEL_FORMAT(Register32):
@@ -84,24 +85,24 @@ class R_JPEG_IO_FLAGS(Register32):
 
 class R_JPEG_OUTPUT_FLAGS(Register32):
     # bit0 doesn't seem to do anything
-    SKIP_HEADERS = 1            # output only SOS/EOI, no SOI/DQT/SOF0/DHT
-    OUTPUT_SOF0_AFTER_DHT = 2   # output SOF0 after DHT instead of before it
+    SKIP_HEADERS = 1  # output only SOS/EOI, no SOI/DQT/SOF0/DHT
+    OUTPUT_SOF0_AFTER_DHT = 2  # output SOF0 after DHT instead of before it
     # bit3 doesn't seem to do anything
-    COMPRESS_WORSE = 4          # not sure exactly what this does
+    COMPRESS_WORSE = 4  # not sure exactly what this does
 
 
 class R_QTBL_SEL(Register32):
     COMPONENT0 = 1, 0
     COMPONENT1 = 3, 2
     COMPONENT2 = 5, 4
-    COMPONENT3 = 7, 6     # guessed
+    COMPONENT3 = 7, 6  # guessed
 
 
 class JPEGRegs(RegMap):
     REG_0x0 = 0x0, Register32
     REG_0x4 = 0x4, Register32
     MODE = 0x8, Register32
-    REG_0xc = 0xc, Register32
+    REG_0xc = 0xC, Register32
 
     REG_0x10 = 0x10, Register32
     REG_0x14 = 0x14, Register32
@@ -113,7 +114,7 @@ class JPEGRegs(RegMap):
 
     CODEC = 0x28, R_CODEC
 
-    REG_0x2c = 0x2c, Register32
+    REG_0x2c = 0x2C, Register32
     REG_0x30 = 0x30, Register32
     REG_0x34 = 0x34, Register32
     # this changes the output drastically if set to 1 for decode
@@ -121,40 +122,40 @@ class JPEGRegs(RegMap):
     REG_0x38 = 0x38, Register32
 
     # not sure what the difference is. siting? type2 seems to win over type1
-    CHROMA_HALVE_H_TYPE1 = 0x3c, Register32
+    CHROMA_HALVE_H_TYPE1 = 0x3C, Register32
     CHROMA_HALVE_H_TYPE2 = 0x40, Register32
     CHROMA_HALVE_V_TYPE1 = 0x44, Register32
     CHROMA_HALVE_V_TYPE2 = 0x48, Register32
 
     # if double and quadruple both set --> double
-    CHROMA_DOUBLE_H = 0x4c, Register32
+    CHROMA_DOUBLE_H = 0x4C, Register32
     CHROMA_QUADRUPLE_H = 0x50, Register32
     CHROMA_DOUBLE_V = 0x54, Register32
 
     # details not fully understood yet
     PX_USE_PLANE1 = 0x58, Register32
-    PX_TILES_W = 0x5c, Register32
+    PX_TILES_W = 0x5C, Register32
     PX_TILES_H = 0x60, Register32
     PX_PLANE0_WIDTH = 0x64, Register32
     PX_PLANE0_HEIGHT = 0x68, Register32
-    PX_PLANE0_TILING_H = 0x6c, Register32
+    PX_PLANE0_TILING_H = 0x6C, Register32
     PX_PLANE0_TILING_V = 0x70, Register32
     PX_PLANE0_STRIDE = 0x74, Register32
     PX_PLANE1_WIDTH = 0x78, Register32
-    PX_PLANE1_HEIGHT = 0x7c, Register32
+    PX_PLANE1_HEIGHT = 0x7C, Register32
     PX_PLANE1_TILING_H = 0x80, Register32
     PX_PLANE1_TILING_V = 0x84, Register32
     PX_PLANE1_STRIDE = 0x88, Register32
 
-    INPUT_START1 = 0x8c, Register32
+    INPUT_START1 = 0x8C, Register32
     INPUT_START2 = 0x90, Register32
     REG_0x94 = 0x94, Register32
     REG_0x98 = 0x98, Register32
-    INPUT_END = 0x9c, Register32
+    INPUT_END = 0x9C, Register32
 
-    OUTPUT_START1 = 0xa0, Register32
-    OUTPUT_START2 = 0xa4, Register32
-    OUTPUT_END = 0xa8, Register32
+    OUTPUT_START1 = 0xA0, Register32
+    OUTPUT_START2 = 0xA4, Register32
+    OUTPUT_END = 0xA8, Register32
 
     MATRIX_MULT = irange(0xAC, 11, 4), Register32
     DITHER = irange(0xD8, 10, 4), Register32
@@ -168,43 +169,43 @@ class JPEGRegs(RegMap):
     # YUV planar: Y U V = 0 for Y, 0/1 for U/V indicating position somehow
     ENCODE_COMPONENT0_POS = 0x104, Register32
     ENCODE_COMPONENT1_POS = 0x108, Register32
-    ENCODE_COMPONENT2_POS = 0x10c, Register32
+    ENCODE_COMPONENT2_POS = 0x10C, Register32
     ENCODE_COMPONENT3_POS = 0x110, Register32
 
     CONVERT_COLOR_SPACE = 0x114, Register32
 
     REG_0x118 = 0x118, Register32
-    REG_0x11c = 0x11c, Register32
+    REG_0x11c = 0x11C, Register32
 
     REG_0x120 = 0x120, Register32
 
     # details not understood yet
     TILING_ENABLE = 0x124, Register32
     TILING_PLANE0 = 0x128, Register32
-    TILING_PLANE1 = 0x12c, Register32
+    TILING_PLANE1 = 0x12C, Register32
 
     DECODE_MACROBLOCKS_W = 0x130, Register32
     DECODE_MACROBLOCKS_H = 0x134, Register32
     RIGHT_EDGE_PIXELS = 0x138, Register32
-    BOTTOM_EDGE_PIXELS = 0x13c, Register32
+    BOTTOM_EDGE_PIXELS = 0x13C, Register32
     RIGHT_EDGE_SAMPLES = 0x140, Register32
     BOTTOM_EDGE_SAMPLES = 0x144, Register32
 
     SCALE_FACTOR = 0x148, R_SCALE_FACTOR
 
-    DECODE_PIXEL_FORMAT = 0x14c, R_DECODE_PIXEL_FORMAT
+    DECODE_PIXEL_FORMAT = 0x14C, R_DECODE_PIXEL_FORMAT
     # 0 = Cb Y'0 Cr Y'1     1 = Y'0 Cb Y'1 Cr
     YUV422_ORDER = 0x150, Register32
     # 0 = BGRA              1 = RGBA
     RGBA_ORDER = 0x154, Register32
     RGBA_ALPHA = 0x158, Register32
 
-    PLANAR_CHROMA_HALVING = 0x15c, Register32
+    PLANAR_CHROMA_HALVING = 0x15C, Register32
 
     REG_0x160 = 0x160, Register32
     REG_0x164 = 0x164, Register32
     # REG_0x168 = 0x168, Register32
-    REG_0x16c = 0x16c, Register32
+    REG_0x16c = 0x16C, Register32
 
     REG_0x170 = 0x170, Register32
     # REG_0x174 = 0x174, Register32
@@ -215,98 +216,98 @@ class JPEGRegs(RegMap):
     TIMEOUT = 0x184, Register32
     HWREV = 0x188, Register32
 
-    REG_0x18c = 0x18c, Register32
+    REG_0x18c = 0x18C, Register32
     REG_0x190 = 0x190, Register32
     REG_0x194 = 0x194, Register32
     REG_0x198 = 0x198, Register32
-    REG_0x19c = 0x19c, Register32
+    REG_0x19c = 0x19C, Register32
 
-    ENABLE_RST_LOGGING = 0x1a0, Register32
-    RST_LOG_ENTRIES = 0x1a4, Register32
+    ENABLE_RST_LOGGING = 0x1A0, Register32
+    RST_LOG_ENTRIES = 0x1A4, Register32
 
-    REG_0x1a8 = 0x1a8, Register32
-    REG_0x1ac = 0x1ac, Register32
-    REG_0x1b0 = 0x1b0, Register32
+    REG_0x1a8 = 0x1A8, Register32
+    REG_0x1ac = 0x1AC, Register32
+    REG_0x1b0 = 0x1B0, Register32
 
-    REG_0x1b4 = 0x1b4, Register32
-    REG_0x1b8 = 0x1b8, Register32
-    REG_0x1bc = 0x1bc, Register32
+    REG_0x1b4 = 0x1B4, Register32
+    REG_0x1b8 = 0x1B8, Register32
+    REG_0x1bc = 0x1BC, Register32
 
-    REG_0x1c0 = 0x1c0, Register32
-    REG_0x1c4 = 0x1c4, Register32
+    REG_0x1c0 = 0x1C0, Register32
+    REG_0x1c4 = 0x1C4, Register32
 
-    REG_0x1c8 = 0x1c8, Register32
+    REG_0x1c8 = 0x1C8, Register32
 
-    REG_0x1cc = 0x1cc, Register32
-    REG_0x1d0 = 0x1d0, Register32
-    REG_0x1d4 = 0x1d4, Register32
-    REG_0x1d8 = 0x1d8, Register32
+    REG_0x1cc = 0x1CC, Register32
+    REG_0x1d0 = 0x1D0, Register32
+    REG_0x1d4 = 0x1D4, Register32
+    REG_0x1d8 = 0x1D8, Register32
 
-    REG_0x1dc = 0x1dc, Register32
-    REG_0x1e0 = 0x1e0, Register32
-    REG_0x1e4 = 0x1e4, Register32
-    REG_0x1e8 = 0x1e8, Register32
+    REG_0x1dc = 0x1DC, Register32
+    REG_0x1e0 = 0x1E0, Register32
+    REG_0x1e4 = 0x1E4, Register32
+    REG_0x1e8 = 0x1E8, Register32
 
-    REG_0x1ec = 0x1ec, Register32
-    REG_0x1f0 = 0x1f0, Register32
-    REG_0x1f4 = 0x1f4, Register32
-    REG_0x1f8 = 0x1f8, Register32
+    REG_0x1ec = 0x1EC, Register32
+    REG_0x1f0 = 0x1F0, Register32
+    REG_0x1f4 = 0x1F4, Register32
+    REG_0x1f8 = 0x1F8, Register32
 
-    REG_0x1fc = 0x1fc, Register32
+    REG_0x1fc = 0x1FC, Register32
     REG_0x200 = 0x200, Register32
 
     REG_0x204 = 0x204, Register32
     REG_0x208 = 0x208, Register32
 
-    REG_0x20c = 0x20c, Register32
+    REG_0x20c = 0x20C, Register32
     REG_0x210 = 0x210, Register32
     REG_0x214 = 0x214, Register32
     REG_0x218 = 0x218, Register32
 
-    REG_0x21c = 0x21c, Register32
+    REG_0x21c = 0x21C, Register32
     REG_0x220 = 0x220, Register32
 
     REG_0x224 = 0x224, Register32
     REG_0x228 = 0x228, Register32
 
-    REG_0x22c = 0x22c, Register32
+    REG_0x22c = 0x22C, Register32
     REG_0x230 = 0x230, Register32
     REG_0x234 = 0x234, Register32
 
     REG_0x238 = 0x238, Register32
-    REG_0x23c = 0x23c, Register32
+    REG_0x23c = 0x23C, Register32
     REG_0x240 = 0x240, Register32
     REG_0x244 = 0x244, Register32
     REG_0x248 = 0x248, Register32
 
-    REG_0x24c = 0x24c, Register32
+    REG_0x24c = 0x24C, Register32
     REG_0x250 = 0x250, Register32
     REG_0x254 = 0x254, Register32
     REG_0x258 = 0x258, Register32
-    REG_0x25c = 0x25c, Register32
+    REG_0x25c = 0x25C, Register32
 
     REG_0x260 = 0x260, Register32
     REG_0x264 = 0x264, Register32
     REG_0x268 = 0x268, Register32
-    REG_0x26c = 0x26c, Register32
+    REG_0x26c = 0x26C, Register32
 
     REG_0x280 = 0x280, Register32
 
     JPEG_IO_FLAGS = 0x1000, R_JPEG_IO_FLAGS
     REG_0x1004 = 0x1004, Register32
     REG_0x1008 = 0x1008, Register32
-    QTBL_SEL = 0x100c, R_QTBL_SEL
+    QTBL_SEL = 0x100C, R_QTBL_SEL
 
     # fixme what _exactly_ does this control
     HUFFMAN_TABLE = 0x1010, Register32
-    RST_INTERVAL = 0x1014, Register32     # 16 bits effective
+    RST_INTERVAL = 0x1014, Register32  # 16 bits effective
     JPEG_HEIGHT = 0x1018, Register32
-    JPEG_WIDTH = 0x101c, Register32
+    JPEG_WIDTH = 0x101C, Register32
 
     COMPRESSED_BYTES = 0x1020, Register32
     JPEG_OUTPUT_FLAGS = 0x1024, R_JPEG_OUTPUT_FLAGS
     REG_0x1028 = 0x1028, Register32
-    REG_0x102c = 0x102c, Register32
+    REG_0x102c = 0x102C, Register32
 
     BITSTREAM_CORRUPTION = 0x1030, Register32
     # REG_0x1034 = 0x1034, Register32
@@ -316,14 +317,14 @@ class JPEGRegs(RegMap):
     REG_0x1080 = 0x1080, Register32
     REG_0x1084 = 0x1084, Register32
     # REG_0x1088 = 0x1088, Register32
-    REG_0x108c = 0x108c, Register32
+    REG_0x108c = 0x108C, Register32
     REG_0x1090 = 0x1090, Register32
 
-    SHIKINO_VERSION_MAGIC0 = 0x10e0, Register32
-    SHIKINO_VERSION_MAGIC1 = 0x10e4, Register32
-    SHIKINO_VERSION_MAGIC2 = 0x10e8, Register32
-    SHIKINO_VERSION_MAGIC3 = 0x10ec, Register32
-    SHIKINO_VERSION_MAGIC4 = 0x10f0, Register32
+    SHIKINO_VERSION_MAGIC0 = 0x10E0, Register32
+    SHIKINO_VERSION_MAGIC1 = 0x10E4, Register32
+    SHIKINO_VERSION_MAGIC2 = 0x10E8, Register32
+    SHIKINO_VERSION_MAGIC3 = 0x10EC, Register32
+    SHIKINO_VERSION_MAGIC4 = 0x10F0, Register32
     # REG_0x10f4 = 0x10f4, Register32
     # REG_0x10f8 = 0x10f8, Register32
     # REG_0x10fc = 0x10fc, Register32

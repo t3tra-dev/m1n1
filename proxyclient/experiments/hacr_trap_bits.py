@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 from m1n1.setup import *
+
 from m1n1 import asm
 
 code_len = 12 * 16 * 8 + 4
@@ -21,27 +24,30 @@ hcr = HCR(u.mrs(HCR_EL2))
 hcr.TIDCP = 0
 hcr.TGE = 0
 u.msr(HCR_EL2, hcr.value)
-u.inst(0xd5033fdf) # isb
+u.inst(0xD5033FDF)  # isb
 
-ACTLR_DEFAULT = 0xc00
+ACTLR_DEFAULT = 0xC00
 ACTLR_AFP = 1 << 5
 u.msr(ACTLR_EL1, ACTLR_DEFAULT | ACTLR_AFP)
 
 code_buffer = p.malloc(code_len)
 data_buffer = p.malloc(data_len)
 
-template = asm.ARMAsm("""
+template = asm.ARMAsm(
+    """
     mov x2, x0
     mrs x2, s3_0_c0_c0_0
     str x2, [x1], #8
     ret
-""", code_buffer)
+""",
+    code_buffer,
+)
 
 mov, mrs, st, ret = struct.unpack("4I", template.data)
 
 data = []
 
-BAD = 0xacce5515abad1dea
+BAD = 0xACCE5515ABAD1DEA
 
 AUX = [
     ACTLR_EL1,
@@ -57,6 +63,7 @@ AUX = [
     APCTL_EL1,
     APSTS_EL1,
 ]
+
 
 def test():
     u.msr(SPRR_CONFIG_EL1, 1)
@@ -102,13 +109,14 @@ def test():
     u.msr(GXF_CONFIG_EL1, 0)
     u.msr(SPRR_CONFIG_EL1, 0)
 
+
 baseline = set(test())
 
 for bit in range(64):
     print()
-    print ("## HACR_EL2[%d]" % bit)
-    u.msr(HACR_EL2, 1<<bit)
-    u.inst(0xd5033fdf) # isb
+    print("## HACR_EL2[%d]" % bit)
+    u.msr(HACR_EL2, 1 << bit)
+    u.inst(0xD5033FDF)  # isb
 
     new = set(test())
 

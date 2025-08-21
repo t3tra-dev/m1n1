@@ -50,7 +50,7 @@ class SEPShMem:
             bfr[offset : offset + len(data)] = data
 
         cnt = len(self.items)
-        bfr[cnt * 16 : cnt * 16 + 4] = b"llun" # null
+        bfr[cnt * 16 : cnt * 16 + 4] = b"llun"  # null
 
         return bfr
 

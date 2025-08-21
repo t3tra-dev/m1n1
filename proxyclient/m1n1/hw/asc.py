@@ -1,46 +1,54 @@
 # SPDX-License-Identifier: MIT
-from ..utils import *
 import time
+
+from ..utils import *
+
 
 class R_MBOX_CTRL(Register32):
     FIFOCNT = 23, 20
     OVERFLOW = 18
     EMPTY = 17
-    FULL  = 16
+    FULL = 16
     RPTR = 15, 12
     WPTR = 11, 8
     ENABLE = 0
 
+
 class R_CPU_CONTROL(Register32):
-    RUN    = 4
+    RUN = 4
+
 
 class R_CPU_STATUS(Register32):
-    IDLE            = 5
-    FIQ_NOT_PEND    = 3 # guess
-    IRQ_NOT_PEND    = 2 # guess
-    STOPPED         = 1
-    RUNNING         = 0
+    IDLE = 5
+    FIQ_NOT_PEND = 3  # guess
+    IRQ_NOT_PEND = 2  # guess
+    STOPPED = 1
+    RUNNING = 0
+
 
 class R_INBOX1(Register64):
-    EP      = 7, 0
+    EP = 7, 0
+
 
 class R_OUTBOX1(Register64):
-    OUTCNT  = 56, 52
-    INCNT   = 51, 48
-    OUTPTR  = 47, 44
-    INPTR   = 43, 40
-    EP      = 7, 0
+    OUTCNT = 56, 52
+    INCNT = 51, 48
+    OUTPTR = 47, 44
+    INPTR = 43, 40
+    EP = 7, 0
+
 
 class ASCRegs(RegMap):
     CPU_CONTROL = 0x0044, R_CPU_CONTROL
-    CPU_STATUS  = 0x0048, R_CPU_STATUS
+    CPU_STATUS = 0x0048, R_CPU_STATUS
 
-    INBOX_CTRL  = 0x8110, R_MBOX_CTRL
+    INBOX_CTRL = 0x8110, R_MBOX_CTRL
     OUTBOX_CTRL = 0x8114, R_MBOX_CTRL
-    INBOX0      = 0x8800, Register64
-    INBOX1      = 0x8808, R_INBOX1
-    OUTBOX0     = 0x8830, Register64
-    OUTBOX1     = 0x8838, R_OUTBOX1
+    INBOX0 = 0x8800, Register64
+    INBOX1 = 0x8808, R_INBOX1
+    OUTBOX0 = 0x8830, Register64
+    OUTBOX1 = 0x8838, R_OUTBOX1
+
 
 class ASC:
     def __init__(self, u, asc_base):

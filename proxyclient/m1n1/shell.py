@@ -1,20 +1,34 @@
 # SPDX-License-Identifier: MIT
-import atexit, serial, os, struct, code, traceback, readline, rlcompleter, sys
-import __main__
+import atexit
 import builtins
+import code
+import os
 import re
+import readline
+import rlcompleter
+import struct
+import sys
+import traceback
+from inspect import isfunction, signature
 
+import __main__
+import serial
+
+from . import sysreg
 from .proxy import *
 from .proxyutils import *
 from .utils import *
-from . import sysreg
-from inspect import isfunction, signature
 
 __all__ = ["ExitConsole", "run_shell"]
 
+
 class HistoryConsole(code.InteractiveConsole):
-    def __init__(self, locals=None, filename="<console>",
-                 histfile=os.path.expanduser("~/.m1n1-history")):
+    def __init__(
+        self,
+        locals=None,
+        filename="<console>",
+        histfile=os.path.expanduser("~/.m1n1-history"),
+    ):
         code.InteractiveConsole.__init__(self, locals, filename)
         self.histfile = histfile
         self.init_history(histfile)
@@ -54,6 +68,8 @@ class HistoryConsole(code.InteractiveConsole):
 
 class ExitConsole(SystemExit):
     pass
+
+
 cmd_list = {}
 subcmd_list = {}
 # Debug levels
@@ -65,18 +81,23 @@ DBL_EDEBUG = 4
 
 db_level = DBL_NONE
 
+
 def debug_cmd(db=None):
-    '''Set debug level to integer %d(none)...%d(extreme debug)''' % (DBL_NONE, DBL_EDEBUG)
+    """Set debug level to integer %d(none)...%d(extreme debug)""" % (
+        DBL_NONE,
+        DBL_EDEBUG,
+    )
     global db_level
     if db:
         db_level = db
     print("debug level=%d" % db_level)
 
+
 def help_cmd(arg=None):
     if db_level >= DBL_DEBUG:
         print("arg=%s" % repr(arg))
     if arg:
-        #cmd = arg.__qualname__
+        # cmd = arg.__qualname__
         if callable(arg):
             cmd = arg.__name__
         elif isinstance(arg, str):
@@ -97,20 +118,19 @@ def help_cmd(arg=None):
             clist = subcmd_list[cmd]
             aname = cmd
             if db_level >= DBL_DEBUG:
-                print("subcmd_list[%s] = %s" %
-                    (repr(cmd), repr(clist)))
+                print("subcmd_list[%s] = %s" % (repr(cmd), repr(clist)))
         else:
             print("command %s is not documented" % cmd)
             return
     else:
         clist = cmd_list
-        aname = 'top level'
+        aname = "top level"
         print("Note: To display a category's commands quote the name e.g. help('HV')")
     print("List of %s commands:" % aname)
     for cmd in clist.keys():
         hinfo = clist[cmd]
         if isinstance(hinfo, str):
-            msg = hinfo.strip().split('\n', 1)[0]
+            msg = hinfo.strip().split("\n", 1)[0]
         elif isinstance(hinfo, int):
             msg = "%s category - %d subcommands" % (cmd, hinfo)
         else:
@@ -121,12 +141,14 @@ def help_cmd(arg=None):
         else:
             print("%s:\n             %s" % (cmd, msg))
 
-#locals is a dictionary for constructing the
+
+# locals is a dictionary for constructing the
 # InteractiveConsole with. It adds in the callables
 # in proxy utils iface and sysreg into locals
 def run_shell(locals, msg=None, exitmsg=None, poll_func=None):
     saved_display = sys.displayhook
     try:
+
         def display(val):
             if isinstance(val, int) and not isinstance(val, bool):
                 builtins._ = val
@@ -154,7 +176,7 @@ def run_shell(locals, msg=None, exitmsg=None, poll_func=None):
                 continue
 
             for attr in dir(obj_class):
-                if attr in locals or attr.startswith('_'):
+                if attr in locals or attr.startswith("_"):
                     continue
 
                 member = getattr(obj_class, attr)
@@ -165,11 +187,11 @@ def run_shell(locals, msg=None, exitmsg=None, poll_func=None):
         for attr in dir(sysreg):
             locals[attr] = getattr(sysreg, attr)
 
-        locals['help'] = help_cmd
-        locals['debug'] = debug_cmd
+        locals["help"] = help_cmd
+        locals["debug"] = debug_cmd
         for obj_name in locals.keys():
             obj = locals.get(obj_name)
-            if obj is None or obj_name.startswith('_'):
+            if obj is None or obj_name.startswith("_"):
                 continue
             if callable(obj) and not isinstance(obj, property):
                 try:
@@ -177,15 +199,15 @@ def run_shell(locals, msg=None, exitmsg=None, poll_func=None):
                 except:
                     continue
                 qn = obj.__qualname__
-                if qn.find('.') > 0:
-                    a = qn.split('.')
+                if qn.find(".") > 0:
+                    a = qn.split(".")
                     if a[0] not in subcmd_list:
                         subcmd_list[a[0]] = {}
                     if a[0] not in cmd_list:
                         cmd_list[a[0]] = 1
                     else:
                         cmd_list[a[0]] += 1
-                    clist = subcmd_list[a[0]] 
+                    clist = subcmd_list[a[0]]
                 else:
                     clist = None
                 if locals[obj_name].__doc__:
@@ -209,8 +231,10 @@ def run_shell(locals, msg=None, exitmsg=None, poll_func=None):
     finally:
         sys.displayhook = saved_display
 
+
 if __name__ == "__main__":
     from .setup import *
+
     locals = dict(__main__.__dict__)
 
     run_shell(locals, msg="Have fun!")

@@ -2,7 +2,8 @@
 
 from enum import Enum
 
-from m1n1.trace.i2c import I2CTracer, I2CDevTracer
+from m1n1.trace.i2c import I2CDevTracer, I2CTracer
+
 
 class HpmTracer(I2CDevTracer):
     class State(Enum):
@@ -34,7 +35,9 @@ class HpmTracer(I2CDevTracer):
         elif self.state == CD3217Tracer.State.REQUEST and read:
             pass
         else:
-            self.log(f"unexpected state in start(read={read}): state:{self.state} reg:{self.reg} data:{self.data}")
+            self.log(
+                f"unexpected state in start(read={read}): state:{self.state} reg:{self.reg} data:{self.data}"
+            )
 
     def stop(self):
         if self.state == CD3217Tracer.State.REQUEST and len(self.data) == 0:
@@ -48,14 +51,16 @@ class HpmTracer(I2CDevTracer):
         elif self.state == CD3217Tracer.State.READ:
             msg += f"r [xx]"
         else:
-            self.log(f"unexpected state in stop(): state:{self.state} reg:{self.reg} data:{self.data}")
+            self.log(
+                f"unexpected state in stop(): state:{self.state} reg:{self.reg} data:{self.data}"
+            )
             self.reset()
             return
 
         # only for debugging as some mismatches are expected as
         # cd3217 seems to report the register size and not the number
         # of requested bytes (or I2CDevTracer truncates reads).
-        #if self.length is not None and self.length > len(self.data):
+        # if self.length is not None and self.length > len(self.data):
         #    self.log(f"length {self.length:02x} mismatch received data: {len(self.data):02x}")
 
         for data in self.data:
@@ -76,6 +81,7 @@ class HpmTracer(I2CDevTracer):
         else:
             self.data.append(data)
 
+
 class CD3217Tracer(HpmTracer):
     def read(self, data):
         if self.length is None:
@@ -94,13 +100,13 @@ for node in hv.adt["/arm-io"]:
     bus = I2CTracer(hv, f"/arm-io/{node.name}")
 
     for mngr_node in node:
-        if "compatible" not in mngr_node._properties: # thanks Apple
+        if "compatible" not in mngr_node._properties:  # thanks Apple
             continue
 
         if mngr_node.compatible[0] != "usbc,manager":
             continue
 
-        addr = mngr_node.reg[0] & 0xff
+        addr = mngr_node.reg[0] & 0xFF
         bus.add_device(addr, HpmTracer(addr=addr, name=mngr_node.name))
 
         for devnode in mngr_node:
@@ -109,7 +115,7 @@ for node in hv.adt["/arm-io"]:
                 "usbc,cd3217": CD3217Tracer,
             }.get(devnode.compatible[0], None)
             if dcls:
-                addr = devnode.hpm_iic_addr & 0xff
+                addr = devnode.hpm_iic_addr & 0xFF
                 bus.add_device(addr, dcls(addr=addr, name=devnode.name))
 
     if len(bus.state.devices) > 1:

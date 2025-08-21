@@ -1,15 +1,24 @@
 # SPDX-License-Identifier: MIT
-import serial, os, struct, sys, time, json, os.path, gzip, functools
+import functools
+import gzip
+import json
+import os
+import os.path
+import struct
+import sys
+import time
 from contextlib import contextmanager
+
+import serial
 from construct import *
 
-from .asm import ARMAsm
-from .proxy import *
-from .utils import Reloadable, chexdiff32
-from .tgtypes import *
-from .sysreg import *
-from .malloc import Heap
 from . import adt
+from .asm import ARMAsm
+from .malloc import Heap
+from .proxy import *
+from .sysreg import *
+from .tgtypes import *
+from .utils import Reloadable, chexdiff32
 
 __all__ = ["ProxyUtils", "RegMonitor", "GuardedHeap", "bootstrap_port"]
 
@@ -38,8 +47,10 @@ VERSION_MAP = {
     "iBoot-8422.141.2": "V13_5",
 }
 
+
 class ProxyUtils(Reloadable):
     CODE_BUFFER_SIZE = 0x10000
+
     def __init__(self, p, heap_size=1024 * 1024 * 1024):
         self.iface = p.iface
         self.proxy = p
@@ -48,9 +59,9 @@ class ProxyUtils(Reloadable):
 
         if self.ba_rev <= 1:
             self.ba = self.iface.readstruct(self.ba_addr, BootArgs_r1)
-        elif  self.ba_rev == 2:
+        elif self.ba_rev == 2:
             self.ba = self.iface.readstruct(self.ba_addr, BootArgs_r2)
-        elif  self.ba_rev == 3:
+        elif self.ba_rev == 3:
             self.ba = self.iface.readstruct(self.ba_addr, BootArgs_r3)
 
         # We allocate a 128MB heap, 128MB after the m1n1 heap, without telling it about it.
@@ -64,13 +75,16 @@ class ProxyUtils(Reloadable):
             self.heap_base = p.heapblock_alloc(0)
         except ProxyRemoteError:
             # Compat with versions that don't have heapblock yet
-            self.heap_base = (self.base + ((self.ba.top_of_kernel_data + 0xffff) & ~0xffff) -
-                              self.ba.phys_base)
+            self.heap_base = (
+                self.base
+                + ((self.ba.top_of_kernel_data + 0xFFFF) & ~0xFFFF)
+                - self.ba.phys_base
+            )
 
         if os.environ.get("M1N1HEAP", ""):
             self.heap_base = int(os.environ.get("M1N1HEAP", ""), 16)
 
-        self.heap_base += 128 * 1024 * 1024 # We leave 128MB for m1n1 heap
+        self.heap_base += 128 * 1024 * 1024  # We leave 128MB for m1n1 heap
         self.heap_top = self.heap_base + self.heap_size
         self.heap = Heap(self.heap_base, self.heap_top)
         self.proxy.heap = self.heap
@@ -105,12 +119,13 @@ class ProxyUtils(Reloadable):
             16: lambda addr: self.proxy.read16(addr),
             32: lambda addr: self.proxy.read32(addr),
             64: lambda addr: self.uread64(addr),
-            128: lambda addr: [self.uread64(addr),
-                               self.uread64(addr + 8)],
-            256: lambda addr: [self.uread64(addr),
-                               self.uread64(addr + 8),
-                               self.uread64(addr + 16),
-                               self.uread64(addr + 24)],
+            128: lambda addr: [self.uread64(addr), self.uread64(addr + 8)],
+            256: lambda addr: [
+                self.uread64(addr),
+                self.uread64(addr + 8),
+                self.uread64(addr + 16),
+                self.uread64(addr + 24),
+            ],
             512: lambda addr: [self.uread64(addr + i) for i in range(0, 64, 8)],
         }
         self._write = {
@@ -118,28 +133,33 @@ class ProxyUtils(Reloadable):
             16: lambda addr, data: self.proxy.write16(addr, data),
             32: lambda addr, data: self.proxy.write32(addr, data),
             64: lambda addr, data: self.uwrite64(addr, data),
-            128: lambda addr, data: (self.uwrite64(addr, data[0]),
-                                     self.uwrite64(addr + 8, data[1])),
-            256: lambda addr, data: (self.uwrite64(addr, data[0]),
-                                     self.uwrite64(addr + 8, data[1]),
-                                     self.uwrite64(addr + 16, data[2]),
-                                     self.uwrite64(addr + 24, data[3])),
-            512: lambda addr, data: [self.uwrite64(addr + 8 * i, data[i])
-                                     for i in range(8)],
+            128: lambda addr, data: (
+                self.uwrite64(addr, data[0]),
+                self.uwrite64(addr + 8, data[1]),
+            ),
+            256: lambda addr, data: (
+                self.uwrite64(addr, data[0]),
+                self.uwrite64(addr + 8, data[1]),
+                self.uwrite64(addr + 16, data[2]),
+                self.uwrite64(addr + 24, data[3]),
+            ),
+            512: lambda addr, data: [
+                self.uwrite64(addr + 8 * i, data[i]) for i in range(8)
+            ],
         }
 
     def uwrite64(self, addr, data):
-        '''write 8 byte value to given address, supporting split 4-byte halves'''
+        """write 8 byte value to given address, supporting split 4-byte halves"""
         if addr & 3:
             raise AlignmentError()
         if addr & 4:
-            self.proxy.write32(addr, data & 0xffffffff)
+            self.proxy.write32(addr, data & 0xFFFFFFFF)
             self.proxy.write32(addr + 4, data >> 32)
         else:
             self.proxy.write64(addr, data)
 
     def uread64(self, addr):
-        '''write 8 byte value to given address, supporting split 4-byte halves'''
+        """write 8 byte value to given address, supporting split 4-byte halves"""
         if addr & 3:
             raise AlignmentError()
         if addr & 4:
@@ -148,42 +168,65 @@ class ProxyUtils(Reloadable):
             return self.proxy.read64(addr)
 
     def read(self, addr, width):
-        '''do a width read from addr and return it
-        width can be 8, 16, 21, 64, 128 or 256'''
+        """do a width read from addr and return it
+        width can be 8, 16, 21, 64, 128 or 256"""
         val = self._read[width](addr)
         if self.proxy.get_exc_count():
             raise ProxyError("Exception occurred")
         return val
 
     def write(self, addr, data, width):
-        '''do a width write of data to addr
-        width can be 8, 16, 21, 64, 128 or 256'''
+        """do a width write of data to addr
+        width can be 8, 16, 21, 64, 128 or 256"""
         self._write[width](addr, data)
         if self.proxy.get_exc_count():
             raise ProxyError("Exception occurred")
 
     def mrs(self, reg, *, silent=False, call=None):
-        '''read system register reg'''
+        """read system register reg"""
         op0, op1, CRn, CRm, op2 = sysreg_parse(reg)
 
-        op =  ((op0 << 19) | (op1 << 16) | (CRn << 12) |
-               (CRm << 8) | (op2 << 5) | 0xd5200000)
+        op = (
+            (op0 << 19)
+            | (op1 << 16)
+            | (CRn << 12)
+            | (CRm << 8)
+            | (op2 << 5)
+            | 0xD5200000
+        )
 
         return self.exec(op, call=call, silent=silent)
 
     def msr(self, reg, val, *, silent=False, call=None):
-        '''Write val to system register reg'''
+        """Write val to system register reg"""
         op0, op1, CRn, CRm, op2 = sysreg_parse(reg)
 
-        op =  ((op0 << 19) | (op1 << 16) | (CRn << 12) |
-               (CRm << 8) | (op2 << 5) | 0xd5000000)
+        op = (
+            (op0 << 19)
+            | (op1 << 16)
+            | (CRn << 12)
+            | (CRm << 8)
+            | (op2 << 5)
+            | 0xD5000000
+        )
 
         self.exec(op, val, call=call, silent=silent)
 
     sys = msr
     sysl = mrs
 
-    def exec(self, op, r0=0, r1=0, r2=0, r3=0, *, silent=False, call=None, ignore_exceptions=False):
+    def exec(
+        self,
+        op,
+        r0=0,
+        r1=0,
+        r2=0,
+        r3=0,
+        *,
+        silent=False,
+        call=None,
+        ignore_exceptions=False,
+    ):
         if callable(call):
             region = REGION_RX_EL1
         elif isinstance(call, tuple):
@@ -197,9 +240,9 @@ class ProxyUtils(Reloadable):
         if op in self.inst_cache:
             func = self.inst_cache[op]
         elif isinstance(op, tuple) or isinstance(op, list):
-            func = struct.pack(f"<{len(op)}II", *op, 0xd65f03c0) # ret
+            func = struct.pack(f"<{len(op)}II", *op, 0xD65F03C0)  # ret
         elif isinstance(op, int):
-            func = struct.pack("<II", op, 0xd65f03c0) # ret
+            func = struct.pack("<II", op, 0xD65F03C0)  # ret
         elif isinstance(op, str):
             c = ARMAsm(op + "; ret", self.code_buffer)
             func = c.data
@@ -244,7 +287,9 @@ class ProxyUtils(Reloadable):
             timeout = self.iface.dev.timeout
             self.iface.dev.timeout = None
             try:
-                decompressed_size = self.proxy.gzdec(compressed_addr, compressed_size, dest, len(data))
+                decompressed_size = self.proxy.gzdec(
+                    compressed_addr, compressed_size, dest, len(data)
+                )
             finally:
                 self.iface.dev.timeout = timeout
 
@@ -253,7 +298,9 @@ class ProxyUtils(Reloadable):
     def get_adt(self):
         if self.adt_data is not None:
             return self.adt_data
-        adt_base = (self.ba.devtree - self.ba.virt_base + self.ba.phys_base) & 0xffffffffffffffff
+        adt_base = (
+            self.ba.devtree - self.ba.virt_base + self.ba.phys_base
+        ) & 0xFFFFFFFFFFFFFFFF
         adt_size = self.ba.devtree_size
         print(f"Fetching ADT ({adt_size} bytes)...")
         self.adt_data = self.iface.readmem(adt_base, self.ba.devtree_size)
@@ -261,14 +308,16 @@ class ProxyUtils(Reloadable):
 
     def push_adt(self):
         self.adt_data = self.adt.build()
-        adt_base = (self.ba.devtree - self.ba.virt_base + self.ba.phys_base) & 0xffffffffffffffff
+        adt_base = (
+            self.ba.devtree - self.ba.virt_base + self.ba.phys_base
+        ) & 0xFFFFFFFFFFFFFFFF
         adt_size = len(self.adt_data)
         print(f"Pushing ADT ({adt_size} bytes)...")
         self.iface.writemem(adt_base, self.adt_data)
 
     def disassemble_at(self, start, size, pc=None, vstart=None, sym=None):
-        '''disassemble len bytes of memory from start
-         optional pc address will mark that line with a '*' '''
+        """disassemble len bytes of memory from start
+        optional pc address will mark that line with a '*'"""
         code = struct.unpack(f"<{size // 4}I", self.iface.readmem(start, size))
         if vstart is None:
             vstart = start
@@ -297,25 +346,38 @@ class ProxyUtils(Reloadable):
         l2c_err_sts = self.mrs(L2C_ERR_STS_EL1)
 
         print(f"  L2C_ERR_STS: {l2c_err_sts:#x}")
-        print(f"  L2C_ERR_ADR: {self.mrs(L2C_ERR_ADR_EL1):#x}");
-        print(f"  L2C_ERR_INF: {self.mrs(L2C_ERR_INF_EL1):#x}");
+        print(f"  L2C_ERR_ADR: {self.mrs(L2C_ERR_ADR_EL1):#x}")
+        print(f"  L2C_ERR_INF: {self.mrs(L2C_ERR_INF_EL1):#x}")
 
-        self.msr(L2C_ERR_STS_EL1, l2c_err_sts) # Clear the flag bits
-        self.msr(DAIF, self.mrs(DAIF) | 0x100) # Re-enable SError exceptions
+        self.msr(L2C_ERR_STS_EL1, l2c_err_sts)  # Clear the flag bits
+        self.msr(DAIF, self.mrs(DAIF) | 0x100)  # Re-enable SError exceptions
 
-    def print_context(self, ctx, is_fault=True, addr=lambda a: f"0x{a:x}", sym=None, num_ctx=9):
+    def print_context(
+        self, ctx, is_fault=True, addr=lambda a: f"0x{a:x}", sym=None, num_ctx=9
+    ):
         print(f"  == Exception taken from {ctx.spsr.M.name} ==")
         el = ctx.spsr.M >> 2
         print(f"  SPSR   = {ctx.spsr}")
-        print(f"  ELR    = {addr(ctx.elr)}" + (f" (0x{ctx.elr_phys:x})" if ctx.elr_phys else ""))
-        print(f"  SP_EL{el} = 0x{ctx.sp[el]:x}" + (f" (0x{ctx.sp_phys:x})" if ctx.sp_phys else ""))
+        print(
+            f"  ELR    = {addr(ctx.elr)}"
+            + (f" (0x{ctx.elr_phys:x})" if ctx.elr_phys else "")
+        )
+        print(
+            f"  SP_EL{el} = 0x{ctx.sp[el]:x}"
+            + (f" (0x{ctx.sp_phys:x})" if ctx.sp_phys else "")
+        )
         if is_fault:
             print(f"  ESR    = {ctx.esr}")
-            print(f"  FAR    = {addr(ctx.far)}" + (f" (0x{ctx.far_phys:x})" if ctx.far_phys else ""))
+            print(
+                f"  FAR    = {addr(ctx.far)}"
+                + (f" (0x{ctx.far_phys:x})" if ctx.far_phys else "")
+            )
 
         for i in range(0, 31, 4):
             j = min(30, i + 3)
-            print(f"  {f'x{i}-x{j}':>7} = {' '.join(f'{r:016x}' for r in ctx.regs[i:j + 1])}")
+            print(
+                f"  {f'x{i}-x{j}':>7} = {' '.join(f'{r:016x}' for r in ctx.regs[i:j + 1])}"
+            )
 
         if ctx.elr_phys:
             print()
@@ -323,10 +385,16 @@ class ProxyUtils(Reloadable):
 
             off = -(num_ctx // 2)
 
-            self.disassemble_at(ctx.elr_phys + 4 * off, num_ctx * 4, ctx.elr, ctx.elr + 4 * off, sym=sym)
+            self.disassemble_at(
+                ctx.elr_phys + 4 * off, num_ctx * 4, ctx.elr, ctx.elr + 4 * off, sym=sym
+            )
 
         if is_fault:
-            if ctx.esr.EC == ESR_EC.MSR or ctx.esr.EC == ESR_EC.IMPDEF and ctx.esr.ISS == 0x20:
+            if (
+                ctx.esr.EC == ESR_EC.MSR
+                or ctx.esr.EC == ESR_EC.IMPDEF
+                and ctx.esr.ISS == 0x20
+            ):
                 print()
                 print("  == MRS/MSR fault decoding ==")
                 if ctx.esr.EC == ESR_EC.MSR:
@@ -391,15 +459,19 @@ class ProxyUtils(Reloadable):
     @property
     def b(self):
         return self.get_simd(SIMD_B)
+
     @property
     def h(self):
         return self.get_simd(SIMD_H)
+
     @property
     def s(self):
         return self.get_simd(SIMD_S)
+
     @property
     def d(self):
         return self.get_simd(SIMD_D)
+
     @property
     def q(self):
         return self.get_simd(SIMD_Q)
@@ -417,6 +489,7 @@ class ProxyUtils(Reloadable):
     def sfr_version(self):
         return self.get_version(self.adt["/chosen"].system_firmware_version)
 
+
 class LazyADT:
     def __init__(self, utils):
         self.__dict__["_utils"] = utils
@@ -424,24 +497,34 @@ class LazyADT:
     @functools.cached_property
     def _adt(self):
         return adt.load_adt(self._utils.get_adt())
+
     def __getitem__(self, item):
         return self._adt[item]
+
     def __setitem__(self, item, value):
-         self._adt[item] = value
+        self._adt[item] = value
+
     def __delitem__(self, item):
-         del self._adt[item]
+        del self._adt[item]
+
     def __contains__(self, item):
         return item in self._adt
+
     def __getattr__(self, attr):
         return getattr(self._adt, attr)
+
     def __setattr__(self, attr, value):
         return setattr(self._adt, attr, value)
+
     def __delattr__(self, attr):
         return delattr(self._adt, attr)
+
     def __str__(self, t=""):
         return str(self._adt)
+
     def __iter__(self):
         return iter(self._adt)
+
 
 class RegMonitor(Reloadable):
     def __init__(self, utils, bufsize=0x100000, ascii=False, log=None):
@@ -504,6 +587,7 @@ class RegMonitor(Reloadable):
             self.log(header + chexdiff32(last, block, offset=offset))
         self.last = cur
 
+
 class GuardedHeap:
     def __init__(self, malloc, memalign=None, free=None):
         if isinstance(malloc, Heap):
@@ -540,6 +624,7 @@ class GuardedHeap:
             self._free(ptr)
         self.ptrs = set()
 
+
 def bootstrap_port(iface, proxy):
     to = iface.dev.timeout
     iface.dev.timeout = 0.15
@@ -557,10 +642,21 @@ def bootstrap_port(iface, proxy):
         try:
             chip_id = proxy.get_chipid()
             # These chips are too slow for baudrate 1500000 at their default frequency
-            if chip_id in (0x8960, 0x7000, 0x7001, 0x8000, 0x8001, 0x8003, 0x8010, 0x8011, 0x8015):
+            if chip_id in (
+                0x8960,
+                0x7000,
+                0x7001,
+                0x8000,
+                0x8001,
+                0x8003,
+                0x8010,
+                0x8011,
+                0x8015,
+            ):
                 proxy.cpufreq_init()
         # Old m1n1 version, assume they are not one of those chips
-        except ProxyCommandError: {}
+        except ProxyCommandError:
+            {}
 
         try:
             iface.nop()

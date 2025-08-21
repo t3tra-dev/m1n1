@@ -1,15 +1,22 @@
 # SPDX-License-Identifier: MIT
-import os, tempfile, shutil, subprocess, re
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+
 from . import sysreg
 from .toolchain import Toolchain
 
 __all__ = ["AsmException", "ARMAsm"]
 
+
 class AsmException(Exception):
     pass
 
+
 class BaseAsm(object):
-    def __init__(self, source, addr = 0):
+    def __init__(self, source, addr=0):
         self.toolchain = Toolchain()
         self.source = source
         self._tmp = tempfile.mkdtemp() + os.sep
@@ -24,7 +31,11 @@ class BaseAsm(object):
 
     def compile(self, source):
         for name, enc in sysreg.sysreg_fwd.items():
-            source = re.sub("\\b" + name + "\\b", f"s{enc[0]}_{enc[1]}_c{enc[2]}_c{enc[3]}_{enc[4]}", source)
+            source = re.sub(
+                "\\b" + name + "\\b",
+                f"s{enc[0]}_{enc[1]}_c{enc[2]}_c{enc[3]}_{enc[4]}",
+                source,
+            )
 
         self.sfile = self._tmp + "b.S"
         with open(self.sfile, "w") as fd:
@@ -38,8 +49,12 @@ class BaseAsm(object):
         self.nfile = self._tmp + "b.n"
 
         self._call(self.toolchain.CC, f"-c -o {self.ofile} {self.sfile}")
-        self._call(self.toolchain.LD, f"--Ttext={self.addr:#x} -o {self.elffile} {self.ofile}")
-        self._call(self.toolchain.OBJCOPY, f"-j.text -O binary {self.elffile} {self.bfile}")
+        self._call(
+            self.toolchain.LD, f"--Ttext={self.addr:#x} -o {self.elffile} {self.ofile}"
+        )
+        self._call(
+            self.toolchain.OBJCOPY, f"-j.text -O binary {self.elffile} {self.bfile}"
+        )
         self._call(self.toolchain.NM, f"{self.elffile} > {self.nfile}")
 
         with open(self.bfile, "rb") as fd:
@@ -74,6 +89,7 @@ class BaseAsm(object):
             shutil.rmtree(self._tmp)
             self._tmp = None
 
+
 class ARMAsm(BaseAsm):
     HEADER = """
     .text
@@ -84,8 +100,10 @@ _start:
     .pool
     """
 
+
 if __name__ == "__main__":
     import sys
+
     code = """
     ldr x0, =0xDEADBEEF
     b test
@@ -95,7 +113,9 @@ if __name__ == "__main__":
 test:
     b test
     ret
-""" % (" ".join(sys.argv[1:]))
+""" % (
+        " ".join(sys.argv[1:])
+    )
     c = ARMAsm(code, 0x1238)
     c.objdump()
     assert c.start == 0x1238

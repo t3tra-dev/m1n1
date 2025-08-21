@@ -1,19 +1,20 @@
 # SPDX-License-Identifier: MIT
-from ...utils import *
-
-from .crash import ASCCrashLogEndpoint
-from .syslog import ASCSysLogEndpoint
-from .mgmt import ASCManagementEndpoint
-from .kdebug import ASCKDebugEndpoint
-from .ioreporting import ASCIOReportingEndpoint
-from .oslog import ASCOSLogEndpoint
-from .base import ASCBaseEndpoint, ASCTimeout
 from ...hw.asc import ASC
+from ...utils import *
+from .base import ASCBaseEndpoint, ASCTimeout
+from .crash import ASCCrashLogEndpoint
+from .ioreporting import ASCIOReportingEndpoint
+from .kdebug import ASCKDebugEndpoint
+from .mgmt import ASCManagementEndpoint
+from .oslog import ASCOSLogEndpoint
+from .syslog import ASCSysLogEndpoint
 
 __all__ = []
 
+
 class ASCDummyEndpoint(ASCBaseEndpoint):
     SHORT = "dummy"
+
 
 class StandardASC(ASC):
     ENDPOINTS = {
@@ -23,7 +24,7 @@ class StandardASC(ASC):
         3: ASCKDebugEndpoint,
         4: ASCIOReportingEndpoint,
         8: ASCOSLogEndpoint,
-        0xa: ASCDummyEndpoint, # tracekit
+        0xA: ASCDummyEndpoint,  # tracekit
     }
 
     def __init__(self, u, asc_base, dart=None, stream=0):
@@ -63,7 +64,11 @@ class StandardASC(ASC):
         return paddr, dva
 
     def ioread(self, dva, size):
-        if self.allow_phys and dva < self.dva_offset or dva >= (self.dva_offset + self.dva_size):
+        if (
+            self.allow_phys
+            and dva < self.dva_offset
+            or dva >= (self.dva_offset + self.dva_size)
+        ):
             return self.iface.readmem(dva, size)
 
         if self.dart:
@@ -72,7 +77,11 @@ class StandardASC(ASC):
             return self.iface.readmem(dva, size)
 
     def iowrite(self, dva, data):
-        if self.allow_phys and dva < self.dva_offset or dva >= (self.dva_offset + self.dva_size):
+        if (
+            self.allow_phys
+            and dva < self.dva_offset
+            or dva >= (self.dva_offset + self.dva_size)
+        ):
             return self.iface.writemem(dva, data)
 
         if self.dart:
@@ -81,7 +90,11 @@ class StandardASC(ASC):
             return self.iface.writemem(dva, data)
 
     def iotranslate(self, dva, size):
-        if self.allow_phys and dva < self.dva_offset or dva >= (self.dva_offset + self.dva_size):
+        if (
+            self.allow_phys
+            and dva < self.dva_offset
+            or dva >= (self.dva_offset + self.dva_size)
+        ):
             return [(dva, size)]
 
         if self.dart:
@@ -121,5 +134,9 @@ class StandardASC(ASC):
         super().boot()
         self.mgmt.wait_boot(1)
 
-__all__.extend(k for k, v in globals().items()
-               if (callable(v) or isinstance(v, type)) and v.__module__ == __name__)
+
+__all__.extend(
+    k
+    for k, v in globals().items()
+    if (callable(v) or isinstance(v, type)) and v.__module__ == __name__
+)

@@ -3,6 +3,7 @@
 
 import re
 
+
 class TestArmAsm:
     """proxyclient.m1n1.ARMAsm tests"""
 

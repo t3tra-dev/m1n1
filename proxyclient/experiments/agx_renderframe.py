@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 
-import sys, pathlib, time
+import pathlib
+import sys
+import time
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
-import atexit, sys
+import atexit
+import sys
 
-from m1n1.setup import *
 from m1n1.constructutils import Ver
+from m1n1.setup import *
 from m1n1.utils import *
 
 Ver.set_version(u)
@@ -69,5 +73,5 @@ try:
     time.sleep(3)
 
 finally:
-    #agx.poll_objects()
+    # agx.poll_objects()
     p.reboot()

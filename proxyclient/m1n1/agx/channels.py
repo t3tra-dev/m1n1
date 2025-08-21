@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: MIT
 
 from construct import *
+
 from ..fw.agx.channels import *
 from ..fw.agx.cmdqueue import *
+
 
 class GPUChannel:
     STATE_FIELDS = ChannelStateFields
@@ -27,16 +29,17 @@ class GPUChannel:
     def log(self, msg):
         self.agx.log(f"[{self.name}] {msg}")
 
+
 class GPUTXChannel(GPUChannel):
     def doorbell(self):
         self.agx.asc.db.doorbell(self.channel_id)
 
     def send_message(self, msg):
         wptr = self.state.WRITE_PTR.val
-        self.iface.writemem(self.ring_addr + self.item_size() * wptr,
-                            msg.build())
+        self.iface.writemem(self.ring_addr + self.item_size() * wptr, msg.build())
         self.state.WRITE_PTR.val = (wptr + 1) % self.ring_size
         self.doorbell()
+
 
 class GPURXChannel(GPUChannel):
     def poll(self):
@@ -47,14 +50,16 @@ class GPURXChannel(GPUChannel):
             raise Exception(f"wptr = {wptr:#x} > {self.ring_size:#x}")
 
         while rptr != wptr:
-            msg = self.iface.readmem(self.ring_addr + self.item_size() * rptr,
-                                     self.item_size())
+            msg = self.iface.readmem(
+                self.ring_addr + self.item_size() * rptr, self.item_size()
+            )
             self.handle_message(self.MSG_CLASS.parse(msg))
             rptr = (rptr + 1) % self.ring_size
         self.state.READ_PTR.val = rptr
 
     def handle_message(self, msg):
         self.log(f"Message: {msg}")
+
 
 class GPUCmdQueueChannel(GPUTXChannel):
     MSG_CLASS = RunCmdQueueMsg
@@ -69,8 +74,9 @@ class GPUCmdQueueChannel(GPUTXChannel):
         msg.new_queue = 1 if queue.first_time else 0
         msg.timestamp = 0
         queue.first_time = False
-        #print(msg)
+        # print(msg)
         self.send_message(msg)
+
 
 class GPUDeviceControlChannel(GPUTXChannel):
     MSG_CLASS = DeviceControlMsg
@@ -102,7 +108,7 @@ class GPUDeviceControlChannel(GPUTXChannel):
         msg.unk_8 = 2
         msg.unk_c = 0
         msg.unk_10 = 0
-        msg.unk_14 = 0xffff
+        msg.unk_14 = 0xFFFF
         msg.unk_18 = 0
         msg.context_addr = ctx.gpu_context._addr
         print(msg)
@@ -127,6 +133,7 @@ class GPUDeviceControlChannel(GPUTXChannel):
         print(msg)
         self.send_message(msg)
 
+
 class GPUFWCtlChannel(GPUTXChannel):
     STATE_FIELDS = FWControlStateFields
     MSG_CLASS = FWCtlMsg
@@ -144,6 +151,7 @@ class GPUFWCtlChannel(GPUTXChannel):
         print(msg)
         self.send_message(msg)
 
+
 class GPUEventChannel(GPURXChannel):
     MSG_CLASS = EventMsg
 
@@ -157,6 +165,7 @@ class GPUEventChannel(GPURXChannel):
         else:
             self.log(f"Unknown event: {msg}")
 
+
 class GPULogChannel(GPURXChannel):
     MSG_CLASS = FWLogMsg
 
@@ -164,11 +173,13 @@ class GPULogChannel(GPURXChannel):
         ts = msg.timestamp / 24000000
         self.log(f"[{msg.seq_no:<4d}{ts:14.7f}] {msg.msg}")
 
+
 class GPUKTraceChannel(GPURXChannel):
     MSG_CLASS = KTraceMsg
 
     def handle_message(self, msg):
         self.log(f"{msg}")
+
 
 class GPUStatsChannel(GPURXChannel):
     MSG_CLASS = HexDump(Bytes(0x60))

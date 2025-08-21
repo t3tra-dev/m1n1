@@ -2,34 +2,39 @@
 
 import struct
 from io import BytesIO
+
 from construct import *
-from ..common import *
+
 from ...utils import *
 from ..asc import StandardASC
 from ..asc.base import *
+from ..common import *
 from .rbep import AFKRingBufEndpoint
 
-EPICType = "EPICType" / Enum(Int32ul,
-    NOTIFY = 0,
-    COMMAND = 3,
-    REPLY = 4,
-    NOTIFY_ACK = 8,
+EPICType = "EPICType" / Enum(
+    Int32ul,
+    NOTIFY=0,
+    COMMAND=3,
+    REPLY=4,
+    NOTIFY_ACK=8,
 )
 
-EPICCategory = "EPICCategory" / Enum(Int8ul,
-    REPORT = 0x00,
-    NOTIFY = 0x10,
-    REPLY = 0x20,
-    COMMAND = 0x30,
+EPICCategory = "EPICCategory" / Enum(
+    Int8ul,
+    REPORT=0x00,
+    NOTIFY=0x10,
+    REPLY=0x20,
+    COMMAND=0x30,
 )
 
-EPICSubtype = "EPICSubtype" / Enum(Int16ul,
-    ANNOUNCE = 0x30,
-    TEARDOWN = 0x32,
-    RETCODE_WITH_PAYLOAD = 0xa0,
-    STD_SERVICE = 0xc0,
-    RETCODE = 0x84,
-    STRING = 0x8a,
+EPICSubtype = "EPICSubtype" / Enum(
+    Int16ul,
+    ANNOUNCE=0x30,
+    TEARDOWN=0x32,
+    RETCODE_WITH_PAYLOAD=0xA0,
+    STD_SERVICE=0xC0,
+    RETCODE=0x84,
+    STRING=0x8A,
 )
 
 EPICHeader = Struct(
@@ -66,15 +71,14 @@ EPICSubHeaderV2 = Struct(
 
 # dcp's announce
 EPICAnnounce = Struct(
-    "name" / Padded(32, CString("utf8")),
-    "props" / Optional(OSSerialize())
+    "name" / Padded(32, CString("utf8")), "props" / Optional(OSSerialize())
 )
 
 # aop's announce
 EPICServiceAnnounce = Struct(
     "name" / Padded(20, CString("utf8")),
     "unk1" / Hex(Int32ul),
-    "retcode" / Hex(Int32ul), # 0xE00002C2
+    "retcode" / Hex(Int32ul),  # 0xE00002C2
     "unk3" / Hex(Int32ul),
     "channel" / Hex(Int32ul),
     "unk5" / Hex(Int32ul),
@@ -82,9 +86,7 @@ EPICServiceAnnounce = Struct(
 )
 
 EPICSetProp = Struct(
-    "name_len" / Int32ul,
-    "name" / Aligned(4, CString("utf8")),
-    "value" / OSSerialize()
+    "name_len" / Int32ul, "name" / Aligned(4, CString("utf8")), "value" / OSSerialize()
 )
 
 EPICCmd = Struct(
@@ -97,6 +99,7 @@ EPICCmd = Struct(
     "txcookie" / Optional(Default(Bool(Int8ul), False)),
 )
 
+
 # Register RX report handlers with @report_handler(type, ConstructClass)
 def report_handler(subtype, repcls):
     def f(x):
@@ -104,10 +107,13 @@ def report_handler(subtype, repcls):
         x.subtype = subtype
         x.repcls = repcls
         return x
+
     return f
+
 
 class EPICError(Exception):
     pass
+
 
 class EPICService:
     RX_BUFSIZE = 0x4000
@@ -175,26 +181,34 @@ class EPICService:
         data = data[:0x50] + b"\x01\x00\x00\x00" + data[0x54:]
 
         pkt = struct.pack("<I", 0) + data
-        self.ep.send_epic(self.chan, EPICType.NOTIFY_ACK, EPICCategory.REPLY, type, seq, pkt, len(data))
+        self.ep.send_epic(
+            self.chan,
+            EPICType.NOTIFY_ACK,
+            EPICCategory.REPLY,
+            type,
+            seq,
+            pkt,
+            len(data),
+        )
 
     def handle_reply(self, category, type, seq, fd):
         off = fd.tell()
         data = fd.read()
 
         ret = data
-        if (hasattr(self, "last_call") and hasattr(self.last_call, "RETS")):
+        if hasattr(self, "last_call") and hasattr(self.last_call, "RETS"):
             call = getattr(self, "last_call")
             item = call.RETS.parse(data)
             ret = item
             self.reply = ret
             return
 
-        if (type == EPICSubtype.RETCODE):
+        if type == EPICSubtype.RETCODE:
             rc = struct.unpack("<I", data)[0]
             self.log(f"Retcode #{seq}: {rc:#x}")
             self.reply = ret
             return
-        elif (type == EPICSubtype.STD_SERVICE):
+        elif type == EPICSubtype.STD_SERVICE:
             fd.seek(off)
             cmd = EPICCmd.parse_stream(fd)
             payload = fd.read()
@@ -207,10 +221,10 @@ class EPICService:
             assert cmd.rxbuf == self.rxbuf_dva
             self.reply = self.iface.readmem(self.rxbuf, cmd.rxlen)
             return
-        elif (type == EPICSubtype.RETCODE_WITH_PAYLOAD):
+        elif type == EPICSubtype.RETCODE_WITH_PAYLOAD:
             rc = struct.unpack("<I", data[:4])[0]
             self.log(f"Retcode #{seq}: {rc:#x}")
-            assert(rc == 0)
+            assert rc == 0
             self.reply = ret
             return
         else:
@@ -234,7 +248,9 @@ class EPICService:
         self.iface.writemem(self.txbuf, data)
         self.reply = None
         pkt = EPICCmd.build(cmd)
-        self.ep.send_epic(self.chan, EPICType.COMMAND, EPICCategory.COMMAND, type, self.seq, pkt)
+        self.ep.send_epic(
+            self.chan, EPICType.COMMAND, EPICCategory.COMMAND, type, self.seq, pkt
+        )
         self.seq += 1
         while self.reply is None:
             self.ep.asc.work()
@@ -243,25 +259,34 @@ class EPICService:
     def send_notify(self, type, data, **kwargs):
         self.reply = None
         self.iface.writemem(self.txbuf, data)
-        self.ep.send_epic(self.chan, EPICType.NOTIFY, EPICCategory.NOTIFY, type, self.seq, data, **kwargs)
+        self.ep.send_epic(
+            self.chan,
+            EPICType.NOTIFY,
+            EPICCategory.NOTIFY,
+            type,
+            self.seq,
+            data,
+            **kwargs,
+        )
         self.seq += 1
         while self.reply is None:
             self.ep.asc.work()
         return self.reply
 
+
 class EPICStandardService(EPICService):
-    def call(self, group, cmd, data=b'', replen=None):
+    def call(self, group, cmd, data=b"", replen=None):
         msg = struct.pack("<2xHIII48x", group, cmd, len(data), 0x69706378) + data
         if replen is not None:
             replen += 64
-        resp = self.send_cmd(0xc0, msg, replen)
+        resp = self.send_cmd(0xC0, msg, replen)
         if not resp:
             return
         rgroup, rcmd, rlen, rmagic = struct.unpack("<2xHIII", resp[:16])
         assert rmagic == 0x69706378
         assert rgroup == group
         assert rcmd == cmd
-        return resp[64:64+rlen]
+        return resp[64 : 64 + rlen]
 
     def getLocation(self, unk=0):
         return struct.unpack("<16xI12x", self.call(4, 4, bytes(32)))
@@ -275,13 +300,14 @@ class EPICStandardService(EPICService):
     def close(self):
         self.call(4, 7, bytes(16))
 
+
 class AFKSystemService(EPICService):
     NAME = "system"
     SHORT = "system"
 
     def getProperty(self, prop, val):
         pass
-        #self.send_cmd(0x40, msg, 0)
+        # self.send_cmd(0x40, msg, 0)
 
     def setProperty(self, prop, val):
         msg = {
@@ -291,6 +317,7 @@ class AFKSystemService(EPICService):
         }
         msg = EPICSetProp.build(msg)
         self.send_cmd(0x43, msg, 0)
+
 
 class EPICEndpoint(AFKRingBufEndpoint):
     def __init__(self, *args, **kwargs):
@@ -309,8 +336,12 @@ class EPICEndpoint(AFKRingBufEndpoint):
         sub = EPICSubHeader.parse_stream(fd)
 
         if self.verbose > 2:
-            self.log(f"Ch {hdr.channel} Type {hdr.type} Ver {hdr.version} Seq {hdr.seq}")
-            self.log(f"  Len {sub.length} Ver {sub.version} Cat {sub.category} Type {sub.type:#x} Seq {sub.seq}")
+            self.log(
+                f"Ch {hdr.channel} Type {hdr.type} Ver {hdr.version} Seq {hdr.seq}"
+            )
+            self.log(
+                f"  Len {sub.length} Ver {sub.version} Cat {sub.category} Type {sub.type:#x} Seq {sub.seq}"
+            )
 
         if sub.category == EPICCategory.REPORT:
             self.handle_report(hdr, sub, fd)
@@ -329,7 +360,7 @@ class EPICEndpoint(AFKRingBufEndpoint):
             self.asc.work()
 
     def handle_report(self, hdr, sub, fd):
-        if sub.type == EPICSubtype.ANNOUNCE: # dcp's announce
+        if sub.type == EPICSubtype.ANNOUNCE:  # dcp's announce
             init = EPICAnnounce.parse_stream(fd)
             if init.props is None:
                 init.props = {}
@@ -345,18 +376,20 @@ class EPICEndpoint(AFKRingBufEndpoint):
                 srv.chan = hdr.channel
                 self.chan_map[hdr.channel] = srv
                 self.serv_map[key] = srv
-                self.log(f"New service: {key} on channel {hdr.channel} (short name: {short})")
+                self.log(
+                    f"New service: {key} on channel {hdr.channel} (short name: {short})"
+                )
             else:
                 self.log(f"Unknown service {key} on channel {hdr.channel}")
-        elif sub.type == EPICSubtype.STD_SERVICE: # aop's announce
+        elif sub.type == EPICSubtype.STD_SERVICE:  # aop's announce
             props = EPICServiceAnnounce.parse_stream(fd)
             name = props.name
             key = props.name
-            chan = props.channel # aop uses channel parsed from prop, not from header
+            chan = props.channel  # aop uses channel parsed from prop, not from header
             if name in self.serv_names:
                 srv = self.serv_names[name](self)
-                short = srv.SHORT # aop has no EPICUnit stuff
-                #setattr(self, short, srv)
+                short = srv.SHORT  # aop has no EPICUnit stuff
+                # setattr(self, short, srv)
                 srv.init(props)
                 srv.chan = chan
                 self.chan_map[chan] = srv
@@ -368,7 +401,9 @@ class EPICEndpoint(AFKRingBufEndpoint):
             if hdr.channel not in self.chan_map:
                 self.log(f"Ignoring report on channel {hdr.channel}")
             else:
-                self.chan_map[hdr.channel].handle_report(sub.category, sub.type, sub.seq, fd)
+                self.chan_map[hdr.channel].handle_report(
+                    sub.category, sub.type, sub.seq, fd
+                )
 
     def handle_notify(self, hdr, sub, fd):
         self.chan_map[hdr.channel].handle_notify(sub.category, sub.type, sub.seq, fd)
@@ -381,17 +416,23 @@ class EPICEndpoint(AFKRingBufEndpoint):
 
     def send_roundtrip(self, chan, call, **kwargs):
         self.serv_map[chan].last_call = call
-        ret = self.serv_map[chan].send_notify(call.TYPE, call.ARGS.build(call.args), **kwargs)
+        ret = self.serv_map[chan].send_notify(
+            call.TYPE, call.ARGS.build(call.args), **kwargs
+        )
         self.serv_map[chan].last_call = None
         return ret
 
     def send_notify(self, chan, call, **kwargs):
-        return self.serv_map[chan].send_notify(call.TYPE, call.ARGS.build(call.args), **kwargs)
+        return self.serv_map[chan].send_notify(
+            call.TYPE, call.ARGS.build(call.args), **kwargs
+        )
 
     def send_cmd(self, chan, type, data, retlen=None, **kwargs):
         return self.serv_map[chan].send_cmd(type, data, retlen, **kwargs)
 
-    def send_epicv4(self, chan, ptype, category, type, seq, data, inline_len=0, **kwargs):
+    def send_epicv4(
+        self, chan, ptype, category, type, seq, data, inline_len=0, **kwargs
+    ):
         hdr = Container()
         hdr.channel = chan
         hdr.type = ptype
@@ -407,7 +448,9 @@ class EPICEndpoint(AFKRingBufEndpoint):
         pkt = EPICHeader.build(hdr) + EPICSubHeader.build(sub) + data
         super().send_ipc(pkt)
 
-    def send_epicv2(self, chan, ptype, category, type, seq, data, inline_len=0, **kwargs):
+    def send_epicv2(
+        self, chan, ptype, category, type, seq, data, inline_len=0, **kwargs
+    ):
         hdr = Container()
         hdr.channel = chan
         hdr.type = ptype
@@ -423,12 +466,19 @@ class EPICEndpoint(AFKRingBufEndpoint):
         pkt = EPICHeader.build(hdr) + EPICSubHeaderV2.build(sub) + data
         super().send_ipc(pkt)
 
-    def send_epic(self, chan, ptype, category, type, seq, data, inline_len=0, version=4, **kwargs):
-        if (version == 2):
-            return self.send_epicv2(chan, ptype, category, type, seq, data, inline_len, **kwargs)
-        if (version == 4):
-            return self.send_epicv4(chan, ptype, category, type, seq, data, inline_len, **kwargs)
+    def send_epic(
+        self, chan, ptype, category, type, seq, data, inline_len=0, version=4, **kwargs
+    ):
+        if version == 2:
+            return self.send_epicv2(
+                chan, ptype, category, type, seq, data, inline_len, **kwargs
+            )
+        if version == 4:
+            return self.send_epicv4(
+                chan, ptype, category, type, seq, data, inline_len, **kwargs
+            )
         raise EPICError(f"unknown epic sub version: {version}")
+
 
 class AFKSystemEndpoint(EPICEndpoint):
     SHORT = "system"

@@ -2,8 +2,9 @@
 from construct import *
 
 from ...utils import *
-from ..asc import StandardASC
 from ..afk.epic import *
+from ..asc import StandardASC
+
 
 class DCPAVControllerService(EPICStandardService):
     NAME = "dcpav-controller-epic"
@@ -16,20 +17,22 @@ class DCPAVControllerService(EPICStandardService):
         return struct.unpack("<16xI12x", self.call(8, 0x9, bytes(32)))
 
     def wakeDisplay(self):
-        self.call(8, 0xa, bytes(16))
+        self.call(8, 0xA, bytes(16))
 
     def sleepDisplay(self):
-        self.call(8, 0xb, bytes(16))
+        self.call(8, 0xB, bytes(16))
 
     def forceHotPlugDetect(self):
-        self.call(8, 0xc, bytes(16))
+        self.call(8, 0xC, bytes(16))
 
     def setVirtualDeviceMode(self, mode):
-        self.call(8, 0xd, struct.pack("<16xI12x", mode))
+        self.call(8, 0xD, struct.pack("<16xI12x", mode))
+
 
 class DCPDPControllerService(EPICStandardService):
     NAME = "dcpdp-controller-epic"
     SHORT = "dcpdp"
+
 
 class DCPDPTXEndpoint(EPICEndpoint):
     SHORT = "dptx"
@@ -38,6 +41,7 @@ class DCPDPTXEndpoint(EPICEndpoint):
         DCPAVControllerService,
         DCPDPControllerService,
     ]
+
 
 ATC0 = 0
 ATC1 = 1
@@ -49,6 +53,7 @@ DPTX = 5
 DPPHY = 0
 DPIN0 = 1
 DPIN1 = 2
+
 
 class DCPDPTXRemotePortService(EPICStandardService):
     NAME = "dcpdptx-port-epic"
@@ -63,10 +68,11 @@ class DCPDPTXRemotePortService(EPICStandardService):
     def connectTo(self, connected, unit, port, unk=0):
         target = 0
         if connected:
-            target |= (1 << 8)
+            target |= 1 << 8
         target |= unit
         target |= port << 4
         self.call(8, 13, struct.pack("<16xII8x", unk, target))
+
 
 class DCPDPTXPortEndpoint(EPICEndpoint):
     SHORT = "dpport"
@@ -76,9 +82,11 @@ class DCPDPTXPortEndpoint(EPICEndpoint):
         DCPDPControllerService,
     ]
 
+
 class DCPDPDevice(EPICStandardService):
     NAME = "dcpav-device-epic"
     SHORT = "dpdev"
+
 
 class DCPAVDeviceEndpoint(EPICEndpoint):
     SHORT = "avdev"
@@ -87,9 +95,11 @@ class DCPAVDeviceEndpoint(EPICEndpoint):
         DCPDPDevice,
     ]
 
+
 class DCPDPService(EPICStandardService):
     NAME = "dcpav-service-epic"
     SHORT = "dpserv"
+
 
 class DCPAVServiceEndpoint(EPICEndpoint):
     SHORT = "avserv"
@@ -98,9 +108,11 @@ class DCPAVServiceEndpoint(EPICEndpoint):
         DCPDPService,
     ]
 
+
 class DCPAVSimpleVideoInterface(EPICStandardService):
     NAME = "dcpav-video-interface-epic"
     SHORT = "video"
+
 
 class DCPAVVideoEndpoint(EPICEndpoint):
     SHORT = "avserv"

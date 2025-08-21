@@ -71,6 +71,7 @@ NM_OUTPUT_GCC = """0000000000011258 T __bss_end__
 
 NM_ERROR_GCC = " 'a.out': No such file\n"
 
+
 @pytest.fixture
 def fx_asm_object_start():
     """Return start location address"""
@@ -108,6 +109,7 @@ def fx_loadobjs_nm_error():
         "clang": NM_ERROR_CLANG,
         "gcc": NM_ERROR_GCC,
     }
+
 
 @pytest.fixture
 def fx_toolchain():

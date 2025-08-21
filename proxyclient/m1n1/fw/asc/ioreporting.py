@@ -1,20 +1,25 @@
 # SPDX-License-Identifier: MIT
-from .base import *
 from ...utils import *
+from .base import *
+
 
 class IOReportingMessage(Register64):
     TYPE = 63, 52
+
 
 class IOReporting_GetBuf(IOReportingMessage):
     TYPE = 63, 52, Constant(1)
     SIZE = 51, 44
     DVA = 43, 0
 
+
 class IOReporting_Start(IOReportingMessage):
-    TYPE = 63, 52, Constant(0xc)
+    TYPE = 63, 52, Constant(0xC)
+
 
 class IOReporting_Report(IOReportingMessage):
     TYPE = 63, 52, Constant(0x8)
+
 
 class ASCIOReportingEndpoint(ASCBaseEndpoint):
     BASE_MESSAGE = IOReportingMessage
@@ -30,7 +35,6 @@ class ASCIOReportingEndpoint(ASCBaseEndpoint):
         if self.iobuffer:
             self.log("WARNING: trying to reset iobuffer!")
 
-
         if msg.DVA != 0:
             self.bufsize = 0x1000 * msg.SIZE
             self.iobuffer = self.iobuffer_dva = msg.DVA
@@ -39,11 +43,13 @@ class ASCIOReportingEndpoint(ASCBaseEndpoint):
             self.bufsize = align(0x1000 * msg.SIZE, 0x4000)
             self.iobuffer, self.iobuffer_dva = self.asc.ioalloc(self.bufsize)
             self.log(f"buf {self.iobuffer:#x} / {self.iobuffer_dva:#x}")
-            self.send(IOReporting_GetBuf(DVA=self.iobuffer_dva, SIZE=self.bufsize // 0x1000))
+            self.send(
+                IOReporting_GetBuf(DVA=self.iobuffer_dva, SIZE=self.bufsize // 0x1000)
+            )
 
         return True
 
-    @msg_handler(0xc, IOReporting_Start)
+    @msg_handler(0xC, IOReporting_Start)
     def Start(self, msg):
         self.log("start")
         return True
@@ -52,6 +58,6 @@ class ASCIOReportingEndpoint(ASCBaseEndpoint):
     def Init(self, msg):
         self.log("report!")
         buf = self.asc.iface.readmem(self.iobuffer, self.bufsize)
-        #chexdump(buf)
+        # chexdump(buf)
         self.send(IOReporting_Report())
         return True

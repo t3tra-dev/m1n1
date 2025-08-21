@@ -1,20 +1,23 @@
 # SPDX-License-Identifier: MIT
-from .base import *
-from ...utils import *
 from construct import *
+
 from ...sysreg import *
+from ...utils import *
+from .base import *
+
 
 class CrashLogMessage(Register64):
     TYPE = 63, 52
     SIZE = 51, 44
     DVA = 43, 0
 
+
 CrashHeader = Struct(
     "type" / Const("CLHE", FourCC),
     "ver" / Int32ul,
     "total_size" / Int32ul,
     "flags" / Int32ul,
-    Padding(16)
+    Padding(16),
 )
 
 CrashCver = Struct(
@@ -36,19 +39,18 @@ CrashCmbx = Struct(
     "type" / Int32ul,
     "unk" / Int32ul,
     "index" / Int32ul,
-    "messages" / GreedyRange(Struct(
-        "endpoint" / Hex(Int64ul),
-        "message" / Hex(Int64ul),
-        "timestamp" / Hex(Int32ul),
-        Padding(4),
-    )),
+    "messages"
+    / GreedyRange(
+        Struct(
+            "endpoint" / Hex(Int64ul),
+            "message" / Hex(Int64ul),
+            "timestamp" / Hex(Int32ul),
+            Padding(4),
+        )
+    ),
 )
 
-CrashCcst = Struct(
-    "task" / Int32ul,
-    "unk" / Int32ul,
-    "stack" / GreedyRange(Int64ul)
-)
+CrashCcst = Struct("task" / Int32ul, "unk" / Int32ul, "stack" / GreedyRange(Int64ul))
 
 CrashCasC = Struct(
     "l2c_err_sts" / Hex(Int64ul),
@@ -56,7 +58,7 @@ CrashCasC = Struct(
     "l2c_err_inf" / Hex(Int64ul),
     "lsu_err_sts" / Hex(Int64ul),
     "fed_err_sts" / Hex(Int64ul),
-    "mmu_err_sts" / Hex(Int64ul)
+    "mmu_err_sts" / Hex(Int64ul),
 )
 
 CrashCrg8 = Struct(
@@ -81,22 +83,30 @@ CrashEntry = Struct(
     Padding(4),
     "flags" / Hex(Int32ul),
     "len" / Int32ul,
-    "payload" / FixedSized(lambda ctx: ctx.len - 16 if ctx.type != "CLHE" else 16,
-                           Switch(this.type, {
-        "Cver": CrashCver,
-        "Ctim": CrashCtim,
-        "Cmbx": CrashCmbx,
-        "Cstr": CrashCstr,
-        "Crg8": CrashCrg8,
-        "Ccst": CrashCcst,
-        "CasC": CrashCasC,
-    }, default=GreedyBytes)),
+    "payload"
+    / FixedSized(
+        lambda ctx: ctx.len - 16 if ctx.type != "CLHE" else 16,
+        Switch(
+            this.type,
+            {
+                "Cver": CrashCver,
+                "Ctim": CrashCtim,
+                "Cmbx": CrashCmbx,
+                "Cstr": CrashCstr,
+                "Crg8": CrashCrg8,
+                "Ccst": CrashCcst,
+                "CasC": CrashCasC,
+            },
+            default=GreedyBytes,
+        ),
+    ),
 )
 
 CrashLog = Struct(
     "header" / CrashHeader,
     "entries" / RepeatUntil(this.type == "CLHE", CrashEntry),
 )
+
 
 class CrashLogParser:
     def __init__(self, data=None, asc=None):
@@ -149,23 +159,29 @@ class CrashLogParser:
         print(f"  SPSR   = {spsr}")
         print(f"  ELR    = {addr(elr)}" + (f" (0x{elr_phys:x})" if elr_phys else ""))
         print(f"  ESR    = {esr}")
-        print(f"  FAR    = {addr(ctx.far)}" + (f" (0x{far_phys:x})" if far_phys else ""))
+        print(
+            f"  FAR    = {addr(ctx.far)}" + (f" (0x{far_phys:x})" if far_phys else "")
+        )
         print(f"  SP     = {ctx.sp:#x}" + (f" (0x{sp_phys:x})" if sp_phys else ""))
 
         for i in range(0, 31, 4):
             j = min(30, i + 3)
-            print(f"  {f'x{i}-x{j}':>7} = {' '.join(f'{r:016x}' for r in ctx.regs[i:j + 1])}")
+            print(
+                f"  {f'x{i}-x{j}':>7} = {' '.join(f'{r:016x}' for r in ctx.regs[i:j + 1])}"
+            )
 
         if elr_phys:
             v = self.asc.p.read32(elr_phys)
 
             print()
-            if v == 0xabad1dea:
+            if v == 0xABAD1DEA:
                 print("  == Faulting code is not available ==")
             else:
                 print("  == Faulting code ==")
                 dist = 16
-                self.asc.u.disassemble_at(elr_phys - dist * 4, (dist * 2 + 1) * 4, elr_phys)
+                self.asc.u.disassemble_at(
+                    elr_phys - dist * 4, (dist * 2 + 1) * 4, elr_phys
+                )
 
         print()
 
@@ -180,7 +196,9 @@ class CrashLogParser:
     def Cmbx(self, entry):
         print(f"Mailbox log (type {entry.payload.type}, index {entry.payload.index}):")
         for i, msg in enumerate(entry.payload.messages):
-            print(f" #{i:3d} @{msg.timestamp:#10x} ep={msg.endpoint:#4x} {msg.message:#18x}")
+            print(
+                f" #{i:3d} @{msg.timestamp:#10x} ep={msg.endpoint:#4x} {msg.message:#18x}"
+            )
         print()
 
     def CLHE(self, entry):
@@ -191,6 +209,7 @@ class CrashLogParser:
         print()
         for entry in self.data.entries:
             getattr(self, entry.type, self.default)(entry)
+
 
 class ASCCrashLogEndpoint(ASCBaseEndpoint):
     SHORT = "crash"
@@ -219,7 +238,9 @@ class ASCCrashLogEndpoint(ASCBaseEndpoint):
             size = align(0x1000 * msg.SIZE, 0x4000)
             self.iobuffer, self.iobuffer_dva = self.asc.ioalloc(size)
             self.log(f"buf {self.iobuffer:#x} / {self.iobuffer_dva:#x}")
-            self.send(CrashLogMessage(TYPE=1, SIZE=size // 0x1000, DVA=self.iobuffer_dva))
+            self.send(
+                CrashLogMessage(TYPE=1, SIZE=size // 0x1000, DVA=self.iobuffer_dva)
+            )
 
         self.started = True
         return True
@@ -242,8 +263,10 @@ class ASCCrashLogEndpoint(ASCBaseEndpoint):
 
         return True
 
+
 if __name__ == "__main__":
     import sys
+
     crashdata = open(sys.argv[1], "rb").read()
     clog = CrashLogParser(crashdata)
     clog.dump()

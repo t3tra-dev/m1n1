@@ -1,57 +1,69 @@
 # SPDX-License-Identifier: MIT
 import time
 
-from .base import *
 from ...utils import *
+from .base import *
+
 
 ## Management endpoint
 class ManagementMessage(Register64):
-    TYPE    = 59, 52
+    TYPE = 59, 52
+
 
 class Mgmt_Hello(ManagementMessage):
-    TYPE    = 59, 52, Constant(1)
+    TYPE = 59, 52, Constant(1)
     MAX_VER = 31, 16
     MIN_VER = 15, 0
+
 
 class Mgmt_HelloAck(ManagementMessage):
-    TYPE    = 59, 52, Constant(2)
+    TYPE = 59, 52, Constant(2)
     MAX_VER = 31, 16
     MIN_VER = 15, 0
 
+
 class Mgmt_Ping(ManagementMessage):
-    TYPE    = 59, 52, Constant(3)
+    TYPE = 59, 52, Constant(3)
+
 
 class Mgmt_Pong(ManagementMessage):
-    TYPE    = 59, 52, Constant(4)
+    TYPE = 59, 52, Constant(4)
+
 
 class Mgmt_StartEP(ManagementMessage):
-    TYPE    = 59, 52, Constant(5)
-    EP      = 39, 32
-    FLAG    = 1, 0
+    TYPE = 59, 52, Constant(5)
+    EP = 39, 32
+    FLAG = 1, 0
+
 
 class Mgmt_SetIOPPower(ManagementMessage):
-    TYPE    = 59, 52, Constant(6)
-    STATE   = 15, 0
+    TYPE = 59, 52, Constant(6)
+    STATE = 15, 0
+
 
 class Mgmt_IOPPowerAck(ManagementMessage):
-    TYPE    = 59, 52, Constant(7)
-    STATE   = 15, 0
+    TYPE = 59, 52, Constant(7)
+    STATE = 15, 0
+
 
 class Mgmt_EPMap(ManagementMessage):
-    TYPE    = 59, 52, Constant(8)
-    LAST    = 51
-    BASE    = 34, 32
-    BITMAP  = 31, 0
+    TYPE = 59, 52, Constant(8)
+    LAST = 51
+    BASE = 34, 32
+    BITMAP = 31, 0
+
 
 class Mgmt_EPMap_Ack(ManagementMessage):
-    TYPE    = 59, 52, Constant(8)
-    LAST    = 51
-    BASE    = 34, 32
-    MORE    = 0
+    TYPE = 59, 52, Constant(8)
+    LAST = 51
+    BASE = 34, 32
+    MORE = 0
+
 
 class Mgmt_SetAPPower(ManagementMessage):
-    TYPE    = 59, 52, Constant(0xb)
-    STATE   = 15, 0
+    TYPE = 59, 52, Constant(0xB)
+    STATE = 15, 0
+
 
 class ASCManagementEndpoint(ASCBaseEndpoint):
     BASE_MESSAGE = ManagementMessage
@@ -80,18 +92,21 @@ class ASCManagementEndpoint(ASCBaseEndpoint):
                 if self.verbose > 0:
                     self.log(f"Adding endpoint {epno:#x}")
 
-        self.send(Mgmt_EPMap_Ack(BASE=msg.BASE, LAST=msg.LAST, MORE=0 if msg.LAST else 1))
+        self.send(
+            Mgmt_EPMap_Ack(BASE=msg.BASE, LAST=msg.LAST, MORE=0 if msg.LAST else 1)
+        )
 
         if msg.LAST:
             for ep in self.asc.eps:
-                if ep == 0: continue
+                if ep == 0:
+                    continue
                 if ep < 0x10:
                     self.asc.start_ep(ep)
             self.boot_done()
 
         return True
 
-    @msg_handler(0xb, Mgmt_SetAPPower)
+    @msg_handler(0xB, Mgmt_SetAPPower)
     def APPowerAck(self, msg):
         if self.verbose > 0:
             self.log(f"AP power state is now {msg.STATE:#x}")

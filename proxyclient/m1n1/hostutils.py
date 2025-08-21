@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
-from pathlib import Path
 import os
+from pathlib import Path
+
 
 class KernelRegmapAccessor:
     def __init__(self, name):
@@ -25,7 +26,8 @@ class KernelRegmapAccessor:
     def _list_regmaps(cls, basedir):
         return {
             p.joinpath("name").open("rb").read().strip().decode(): p
-            for p in basedir.iterdir() if p.is_dir()
+            for p in basedir.iterdir()
+            if p.is_dir()
         }
 
     def open_node(self, name, mode="rb", **kwargs):
@@ -83,14 +85,18 @@ class KernelRegmapAccessor:
         for off in range(0, width // 8, self.working_width // 8):
             self._write(reg + off, val >> (8 * off), self.working_width)
 
+
 def require_debugfs():
     if os.path.ismount("/sys/kernel/debug"):
         return
     os.system("mount -t debugfs none /sys/kernel/debug")
 
+
 if __name__ == "__main__":
     require_debugfs()
     from m1n1.hw.codecs import TAS5770Regs
+
     tas = TAS5770Regs(KernelRegmapAccessor("tas2770"), 0)
     import code
+
     code.interact(local=locals())

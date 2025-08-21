@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: MIT
-from contextlib import contextmanager, ExitStack
-import sys, pathlib, os
-import subprocess
-import tempfile
 import bisect
+import os
+import pathlib
+import subprocess
+import sys
+import tempfile
+from contextlib import ExitStack, contextmanager
 
 from .toolchain import Toolchain
 
@@ -11,18 +13,22 @@ __all__ = ["LinkedProgram"]
 
 _toolchain = Toolchain()
 
+
 def tool_output_lines(progname, *args):
-    with subprocess.Popen([progname] + list(args),
-            stdout=subprocess.PIPE) as proc:
+    with subprocess.Popen([progname] + list(args), stdout=subprocess.PIPE) as proc:
         for line in proc.stdout:
             yield line.decode("ascii")
         proc.wait()
         if proc.returncode:
-            raise Exception(f"{progname} (args: {args}) exited with status {proc.returncode}")
+            raise Exception(
+                f"{progname} (args: {args}) exited with status {proc.returncode}"
+            )
+
 
 def run_tool(progname, *args, silent=False):
-    subprocess.check_call([progname] + list(args),
-                        stdout=subprocess.DEVNULL if silent else None)
+    subprocess.check_call(
+        [progname] + list(args), stdout=subprocess.DEVNULL if silent else None
+    )
 
 
 class LinkedProgram:
@@ -51,18 +57,19 @@ class LinkedProgram:
 
         tmp = os.path.join(tempfile.mkdtemp(), "bin")
         path = os.path.join(self.SOURCE_ROOT, self.base_object)
-        run_tool(_toolchain.OBJCOPY, "-O", "binary", path, tmp, "--only-section=.rela.dyn")
+        run_tool(
+            _toolchain.OBJCOPY, "-O", "binary", path, tmp, "--only-section=.rela.dyn"
+        )
         rela_objfile = open(tmp, "rb").read()
 
-        if rela_objfile[:len(rela_target)] != rela_target:
+        if rela_objfile[: len(rela_target)] != rela_target:
             raise Exception(f"Mismatch between {self.base_object} and image on target")
 
     def m1n1_is_macho(self):
         p = self.u.proxy
-        return p.read32(p.get_base()) == 0xfeedfacf
+        return p.read32(p.get_base()) == 0xFEEDFACF
 
-    def _load_elf_symbols(self, relpath, offset=0,
-                            objname=None, ignore=""):
+    def _load_elf_symbols(self, relpath, offset=0, objname=None, ignore=""):
         path = pathlib.Path(self.SOURCE_ROOT, relpath)
         symaddrs = dict()
 
@@ -81,7 +88,7 @@ class LinkedProgram:
         return symaddrs
 
     def load_obj(self, objfile, base=None):
-        ALLOC_SIZE = 16*4096
+        ALLOC_SIZE = 16 * 4096
 
         if base is None:
             base = self.u.heap.memalign(0x4000, ALLOC_SIZE)
@@ -100,9 +107,18 @@ class LinkedProgram:
             f.write("}\n")
             for sym in self.symbols:
                 f.write(f"{sym[1]} = 0x{sym[0]:x};\n")
-        run_tool(_toolchain.LD, "-EL", "-maarch64elf", "-T", ld_script, "-o", elffile, objfile)
+        run_tool(
+            _toolchain.LD,
+            "-EL",
+            "-maarch64elf",
+            "-T",
+            ld_script,
+            "-o",
+            elffile,
+            objfile,
+        )
         run_tool(_toolchain.OBJCOPY, "-O", "binary", elffile, binfile)
-        #run_tool("objdump", "-d", elffile)
+        # run_tool("objdump", "-d", elffile)
         self._load_elf_symbols(elffile, ignore="A")
         with open(binfile, "rb") as f:
             buf = f.read()
@@ -120,8 +136,11 @@ class LinkedProgram:
             self.u.free(base)
         self._alloced_bases = []
 
-        self.symbols = [(a, b, objname) for (a, b, objname) \
-                        in self.symbols if objname == self.base_object]
+        self.symbols = [
+            (a, b, objname)
+            for (a, b, objname) in self.symbols
+            if objname == self.base_object
+        ]
 
     @contextmanager
     def _copy_args_to_target(self, args):
@@ -146,6 +165,7 @@ class LinkedProgram:
         def call_symbol(*args, call=self.u.proxy.call):
             with self._copy_args_to_target(args) as args_copied:
                 return call(addr, *args_copied)
+
         return call_symbol
 
     def lookup(self, addr):
@@ -160,20 +180,30 @@ class LinkedProgram:
         objfile = tmp + ".o"
         with open(cfile, "w") as f:
             f.write(source)
-        run_tool("make", "-C", self.SOURCE_ROOT, "invoke_cc",
-                 f"OBJFILE={objfile}", f"CFILE={cfile}", silent=True)
+        run_tool(
+            "make",
+            "-C",
+            self.SOURCE_ROOT,
+            "invoke_cc",
+            f"OBJFILE={objfile}",
+            f"CFILE={cfile}",
+            silent=True,
+        )
         self.load_obj(objfile)
 
 
 if __name__ == "__main__":
     from m1n1.setup import *
+
     lp = LinkedProgram(u)
     lp.debug_printf("hello from the other side! (%d)\n", 42)
-    lp.load_inline_c('''
+    lp.load_inline_c(
+        """
         #include "utils.h"
         int add(int a, int b) {
             debug_printf("adding %d and %d\\n", a, b);
             return a + b;
         }
-    ''')
+    """
+    )
     print(f"1 + 2 = {lp.add(1, 2)}")

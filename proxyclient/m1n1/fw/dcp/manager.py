@@ -1,18 +1,20 @@
 # SPDX-License-Identifier: MIT
+import functools
 import pprint
-import struct, functools, time
+import struct
+import time
 from dataclasses import dataclass
 from enum import IntEnum
 
 from construct.lib import hexundump
 
-from ..asc.base import *
 from ...utils import *
-
+from ..asc.base import *
 from . import ipc
 from .dcpep import CallContext
 
 ## DCP API manager
+
 
 class DCPBaseManager:
     def __init__(self, dcpep):
@@ -61,8 +63,9 @@ class DCPBaseManager:
         rpc = functools.partial(self.dcpep.ch_cmd.call, ctx, tag, out_len=out_len)
         return functools.partial(method.call, rpc)
 
+
 class DCPManager(DCPBaseManager):
-    def __init__(self, dcpep, compatible='t8103'):
+    def __init__(self, dcpep, compatible="t8103"):
         super().__init__(dcpep)
 
         self.iomfb_prop = {}
@@ -103,11 +106,15 @@ class DCPManager(DCPBaseManager):
         print(f"setProperty({key} = {value!r})")
         return True
 
-    setProperty_dict = setProperty_int = setProperty_bool = setProperty_str = setProperty
+    setProperty_dict = setProperty_int = setProperty_bool = setProperty_str = (
+        setProperty
+    )
 
     def swap_complete_ap_gated(self, swap_id, unkBool, swap_data, swap_info, unkUint):
         swap_data_ptr = "NULL" if swap_data is None else "..."
-        print(f"swap_complete_ap_gated({swap_id}, {unkBool}, {swap_data_ptr}, ..., {unkUint}")
+        print(
+            f"swap_complete_ap_gated({swap_id}, {unkBool}, {swap_data_ptr}, ..., {unkUint}"
+        )
         if swap_data is not None:
             chexdump(swap_data)
         chexdump(swap_info)
@@ -115,7 +122,9 @@ class DCPManager(DCPBaseManager):
         self.frame = swap_id
 
     def swap_complete_intent_gated(self, swap_id, unkB, unkInt, width, height):
-        print(f"swap_complete_intent_gated({swap_id}, {unkB}, {unkInt}, {width}, {height}")
+        print(
+            f"swap_complete_intent_gated({swap_id}, {unkB}, {unkInt}, {width}, {height}"
+        )
         self.swaps += 1
         self.frame = swap_id
 
@@ -124,8 +133,12 @@ class DCPManager(DCPBaseManager):
 
     # wrapper for set_digital_out_mode to print information on the set modes
     def SetDigitalOutMode(self, color_id, timing_id):
-        color_mode = [x for x in self.dcpav_prop['ColorElements'] if x['ID'] == color_id][0]
-        timing_mode = [x for x in self.dcpav_prop['TimingElements'] if x['ID'] == timing_id][0]
+        color_mode = [
+            x for x in self.dcpav_prop["ColorElements"] if x["ID"] == color_id
+        ][0]
+        timing_mode = [
+            x for x in self.dcpav_prop["TimingElements"] if x["ID"] == timing_id
+        ][0]
         pprint.pprint(color_mode)
         pprint.pprint(timing_mode)
         self.set_digital_out_mode(color_id, timing_id)
@@ -143,15 +156,15 @@ class DCPManager(DCPBaseManager):
 
     def rt_bandwidth_setup_ap(self, config):
         print("rt_bandwidth_setup_ap(...)")
-        if self.compatible == 't8103':
+        if self.compatible == "t8103":
             config.val = {
-                "reg1": 0x23b738014, # reg[5] in disp0/dispext0, plus 0x14 - part of pmgr
-                "reg2": 0x23bc3c000, # reg[6] in disp0/dispext0 - part of pmp/pmgr
+                "reg1": 0x23B738014,  # reg[5] in disp0/dispext0, plus 0x14 - part of pmgr
+                "reg2": 0x23BC3C000,  # reg[6] in disp0/dispext0 - part of pmp/pmgr
                 "bit": 2,
             }
-        elif self.compatible == 't600x':
+        elif self.compatible == "t600x":
             config.val = {
-                "reg1": 0x28e3d0000 + 0x988, # reg[4] in disp0/dispext0, plus 0x988
+                "reg1": 0x28E3D0000 + 0x988,  # reg[4] in disp0/dispext0, plus 0x988
                 "reg2": 0x0,
                 "bit": 0,
             }
@@ -189,7 +202,7 @@ class DCPManager(DCPBaseManager):
 
     def setDCPAVPropStart(self, length):
         print(f"setDCPAVPropStart({length:#x})")
-        self.dcpav_prop_len = length - 1 # off by one?
+        self.dcpav_prop_len = length - 1  # off by one?
         self.dcpav_prop_off = 0
         self.dcpav_prop_data = []
         return True
@@ -207,7 +220,7 @@ class DCPManager(DCPBaseManager):
         assert self.dcpav_prop_len == len(blob)
         self.dcpav_prop[key] = ipc.OSSerialize().parse(blob)
         self.dcpav_prop_data = self.dcpav_prop_len = self.dcpav_prop_off = None
-        #pprint.pprint(self.dcpav_prop[key])
+        # pprint.pprint(self.dcpav_prop[key])
         return True
 
     def set_boolean_property(self, key, value):
@@ -269,7 +282,9 @@ class DCPManager(DCPBaseManager):
         print(f"sr_getClockFrequency({obj}, {arg})")
         return 533333328
 
-    sr_setProperty_dict = sr_setProperty_int = sr_setProperty_bool = sr_setProperty_str = sr_setProperty
+    sr_setProperty_dict = sr_setProperty_int = sr_setProperty_bool = (
+        sr_setProperty_str
+    ) = sr_setProperty
 
     def sr_get_uint_prop(self, obj, key, value):
         value.val = 0
@@ -284,7 +299,9 @@ class DCPManager(DCPBaseManager):
     def sr_mapDeviceMemoryWithIndex(self, obj, index, flags, addr, length):
         assert obj == "PROV"
         addr.val, length.val = self.dcp.u.adt["/arm-io/disp0"].get_reg(index)
-        print(f"sr_mapDeviceMemoryWithIndex({obj}, {index}, {flags}, {addr.val:#x}, {length.val:#x})")
+        print(
+            f"sr_mapDeviceMemoryWithIndex({obj}, {index}, {flags}, {addr.val:#x}, {length.val:#x})"
+        )
         return 0
 
     ## PropRelay methods
@@ -312,8 +329,9 @@ class DCPManager(DCPBaseManager):
     def map_physical(self, paddr, size, flags, dva, dvasize):
         dvasize.val = align_up(size, 4096)
         dva.val = self.dcp.dart.iomap(0, paddr, size)
-        print(f"map_physical({paddr:#x}, {size:#x}, {flags}, {dva.val:#x}, {dvasize.val:#x})")
+        print(
+            f"map_physical({paddr:#x}, {size:#x}, {flags}, {dva.val:#x}, {dvasize.val:#x})"
+        )
 
         self.mapid += 1
         return self.mapid
-

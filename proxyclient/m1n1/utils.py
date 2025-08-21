@@ -1,17 +1,36 @@
 # SPDX-License-Identifier: MIT
+import bisect
+import copy
+import functools
+import heapq
+import importlib
+import itertools
+import os
+import re
+import signal
+import struct
+import sys
+import threading
+import time
+import traceback
 from enum import Enum
-import threading, traceback, bisect, copy, heapq, importlib, sys, itertools, time, os, functools, struct, re, signal
-from construct import Adapter, Int64ul, Int32ul, Int16ul, Int8ul, ExprAdapter, GreedyRange, ListContainer, StopFieldError, ExplicitError, StreamError
+
+from construct import (Adapter, ExplicitError, ExprAdapter, GreedyRange, Int8ul, Int16ul, Int32ul,
+                       Int64ul, ListContainer, StopFieldError, StreamError)
 
 __all__ = ["FourCC"]
+
 
 def align_up(v, a=16384):
     return (v + a - 1) & ~(a - 1)
 
+
 align = align_up
+
 
 def align_down(v, a=16384):
     return v & ~(a - 1)
+
 
 def align_pot(v):
     out = 1
@@ -19,39 +38,51 @@ def align_pot(v):
         out *= 2
     return out
 
+
 def hexdump(s, sep=" "):
-    return sep.join(["%02x"%x for x in s])
+    return sep.join(["%02x" % x for x in s])
+
 
 def hexdump32(s, sep=" "):
-    vals = struct.unpack("<%dI" % (len(s)//4), s)
-    return sep.join(["%08x"%x for x in vals])
+    vals = struct.unpack("<%dI" % (len(s) // 4), s)
+    return sep.join(["%08x" % x for x in vals])
+
 
 def _ascii(s):
     s2 = ""
     for c in s:
-        if c < 0x20 or c > 0x7e:
+        if c < 0x20 or c > 0x7E:
             s2 += "."
         else:
             s2 += chr(c)
     return s2
 
+
 def chexdump(s, st=0, abbreviate=True, stride=16, indent="", print_fn=print):
     last = None
     skip = False
-    for i in range(0,len(s),stride):
-        val = s[i:i+stride]
+    for i in range(0, len(s), stride):
+        val = s[i : i + stride]
         if val == last and abbreviate:
             if not skip:
-                print_fn(indent+"%08x  *" % (i + st))
+                print_fn(indent + "%08x  *" % (i + st))
                 skip = True
         else:
-            print_fn(indent+"%08x  %s  |%s|" % (
-                i + st,
-                "  ".join(hexdump(val[i:i+8], ' ').ljust(23)
-                          for i in range(0, stride, 8)),
-                _ascii(val).ljust(stride)))
+            print_fn(
+                indent
+                + "%08x  %s  |%s|"
+                % (
+                    i + st,
+                    "  ".join(
+                        hexdump(val[i : i + 8], " ").ljust(23)
+                        for i in range(0, stride, 8)
+                    ),
+                    _ascii(val).ljust(stride),
+                )
+            )
             last = val
             skip = False
+
 
 def chexdiff32(prev, cur, ascii=True, offset=0, offset2=None):
     assert len(cur) % 4 == 0
@@ -72,27 +103,27 @@ def chexdiff32(prev, cur, ascii=True, offset=0, offset2=None):
         if offset2 is not None:
             off_text += f"/{offset2 + i * 4:08x}"
         if not last:
-            if i != 0 and words[i:i+row] == words[i-row:i]:
+            if i != 0 and words[i : i + row] == words[i - row : i]:
                 if not skipping:
                     out.append(f"{off_text} *\n")
                 skipping = True
             else:
                 out.append(f"{off_text} ")
-                for new in words[i:i+row]:
+                for new in words[i : i + row]:
                     out.append("%08x " % new)
                 if ascii:
-                    out.append("| " + _ascii(cur[4*i:4*(i+row)]))
+                    out.append("| " + _ascii(cur[4 * i : 4 * (i + row)]))
                 out.append("\n")
                 skipping = False
-        elif last[i:i+row] != words[i:i+row]:
+        elif last[i : i + row] != words[i : i + row]:
             out.append(f"{off_text} ")
-            for old, new in zip(last[i:i+row], words[i:i+row]):
+            for old, new in zip(last[i : i + row], words[i : i + row]):
                 so = "%08x" % old
                 sn = s = "%08x" % new
                 if old != new:
                     s = "\x1b[32m"
                     ld = False
-                    for a,b in zip(so, sn):
+                    for a, b in zip(so, sn):
                         d = a != b
                         if ld != d:
                             s += "\x1b[31;1;4m" if d else "\x1b[32m"
@@ -101,9 +132,10 @@ def chexdiff32(prev, cur, ascii=True, offset=0, offset2=None):
                     s += "\x1b[m"
                 out.append(s + " ")
             if ascii:
-                out.append("| " + _ascii(cur[4*i:4*(i+row)]))
+                out.append("| " + _ascii(cur[4 * i : 4 * (i + row)]))
             out.append("\n")
     return "".join(out)
+
 
 def chexundump(dump, base=0):
     if type(dump) is bytes:
@@ -128,92 +160,242 @@ def chexundump(dump, base=0):
                 raise ValueError("odd sized data")
             if offset > len(decoded):
                 decoded.extend([0] * (offset - len(decoded) - base))
-            decoded.extend([int(data[i:i+2], 16) for i \
-                            in range(0, len(data), 2)])
+            decoded.extend([int(data[i : i + 2], 16) for i in range(0, len(data), 2)])
         except (ValueError, TypeError) as exc:
             raise ValueError(f"can't decode line: {line:r}") from exc
 
     return decoded
 
+
 _extascii_table_low = [
-    "▪", "☺", "☻", "♥", "♦", "♣", "♠", "•",
-    "◘", "○", "◙", "♂", "♀", "♪", "♫", "☼",
-    "►", "◄", "↕", "‼", "¶", "§", "▬", "↨",
-    "↑", "↓", "→", "←", "∟", "↔", "▲", "▼"]
+    "▪",
+    "☺",
+    "☻",
+    "♥",
+    "♦",
+    "♣",
+    "♠",
+    "•",
+    "◘",
+    "○",
+    "◙",
+    "♂",
+    "♀",
+    "♪",
+    "♫",
+    "☼",
+    "►",
+    "◄",
+    "↕",
+    "‼",
+    "¶",
+    "§",
+    "▬",
+    "↨",
+    "↑",
+    "↓",
+    "→",
+    "←",
+    "∟",
+    "↔",
+    "▲",
+    "▼",
+]
 
 _extascii_table_high = [
     "⌂",
-    "█", "⡀", "⢀", "⣀", "⠠", "⡠", "⢠", "⣠",
-    "⠄", "⡄", "⢄", "⣄", "⠤", "⡤", "⢤", "⣤",
-    "⠁", "⡁", "⢁", "⣁", "⠡", "⡡", "⢡", "⣡",
-    "⠅", "⡅", "⢅", "⣅", "⠥", "⡥", "⢥", "⣥",
-    "⠃", "⡃", "⢃", "⣃", "⠣", "⡣", "⢣", "⣣",
-    "⠇", "⡇", "⢇", "⣇", "⠧", "⡧", "⢧", "⣧",
-    "⠉", "⡉", "⢉", "⣉", "⠩", "⡩", "⢩", "⣩",
-    "⠍", "⡍", "⢍", "⣍", "⠭", "⡭", "⢭", "⣭",
-    "⠊", "⡊", "⢊", "⣊", "⠪", "⡪", "⢪", "⣪",
-    "⠎", "⡎", "⢎", "⣎", "⠮", "⡮", "⢮", "⣮",
-    "⠑", "⡑", "⢑", "⣑", "⠱", "⡱", "⢱", "⣱",
-    "⠕", "⡕", "⢕", "⣕", "⠵", "⡵", "⢵", "⣵",
-    "⠚", "⡚", "⢚", "⣚", "⠺", "⡺", "⢺", "⣺",
-    "⠞", "⡞", "⢞", "⣞", "⠾", "⡾", "⢾", "⣾",
-    "⠛", "⡛", "⢛", "⣛", "⠻", "⡻", "⢻", "⣻",
-    "⠟", "⡟", "⢟", "⣟", "⠿", "⡿", "⢿", "⣿"]
+    "█",
+    "⡀",
+    "⢀",
+    "⣀",
+    "⠠",
+    "⡠",
+    "⢠",
+    "⣠",
+    "⠄",
+    "⡄",
+    "⢄",
+    "⣄",
+    "⠤",
+    "⡤",
+    "⢤",
+    "⣤",
+    "⠁",
+    "⡁",
+    "⢁",
+    "⣁",
+    "⠡",
+    "⡡",
+    "⢡",
+    "⣡",
+    "⠅",
+    "⡅",
+    "⢅",
+    "⣅",
+    "⠥",
+    "⡥",
+    "⢥",
+    "⣥",
+    "⠃",
+    "⡃",
+    "⢃",
+    "⣃",
+    "⠣",
+    "⡣",
+    "⢣",
+    "⣣",
+    "⠇",
+    "⡇",
+    "⢇",
+    "⣇",
+    "⠧",
+    "⡧",
+    "⢧",
+    "⣧",
+    "⠉",
+    "⡉",
+    "⢉",
+    "⣉",
+    "⠩",
+    "⡩",
+    "⢩",
+    "⣩",
+    "⠍",
+    "⡍",
+    "⢍",
+    "⣍",
+    "⠭",
+    "⡭",
+    "⢭",
+    "⣭",
+    "⠊",
+    "⡊",
+    "⢊",
+    "⣊",
+    "⠪",
+    "⡪",
+    "⢪",
+    "⣪",
+    "⠎",
+    "⡎",
+    "⢎",
+    "⣎",
+    "⠮",
+    "⡮",
+    "⢮",
+    "⣮",
+    "⠑",
+    "⡑",
+    "⢑",
+    "⣑",
+    "⠱",
+    "⡱",
+    "⢱",
+    "⣱",
+    "⠕",
+    "⡕",
+    "⢕",
+    "⣕",
+    "⠵",
+    "⡵",
+    "⢵",
+    "⣵",
+    "⠚",
+    "⡚",
+    "⢚",
+    "⣚",
+    "⠺",
+    "⡺",
+    "⢺",
+    "⣺",
+    "⠞",
+    "⡞",
+    "⢞",
+    "⣞",
+    "⠾",
+    "⡾",
+    "⢾",
+    "⣾",
+    "⠛",
+    "⡛",
+    "⢛",
+    "⣛",
+    "⠻",
+    "⡻",
+    "⢻",
+    "⣻",
+    "⠟",
+    "⡟",
+    "⢟",
+    "⣟",
+    "⠿",
+    "⡿",
+    "⢿",
+    "⣿",
+]
+
 
 def _extascii(s):
     s2 = ""
     for c in s:
         if c < 0x20:
             s2 += _extascii_table_low[c]
-        elif c > 0x7e:
-            s2 += _extascii_table_high[c-0x7f]
+        elif c > 0x7E:
+            s2 += _extascii_table_high[c - 0x7F]
         else:
             s2 += chr(c)
     return s2
 
+
 def ehexdump(s, st=0, abbreviate=True, indent="", print_fn=print):
     last = None
     skip = False
-    for i in range(0,len(s),16):
-        val = s[i:i+16]
+    for i in range(0, len(s), 16):
+        val = s[i : i + 16]
         if val == last and abbreviate:
             if not skip:
-                print_fn(indent+"%08x  *" % (i + st))
+                print_fn(indent + "%08x  *" % (i + st))
                 skip = True
         else:
-            print_fn(indent+"%08x  %s  %s  |%s|" % (
-                  i + st,
-                  hexdump(val[:8], ' ').ljust(23),
-                  hexdump(val[8:], ' ').ljust(23),
-                  _extascii(val).ljust(16)))
+            print_fn(
+                indent
+                + "%08x  %s  %s  |%s|"
+                % (
+                    i + st,
+                    hexdump(val[:8], " ").ljust(23),
+                    hexdump(val[8:], " ").ljust(23),
+                    _extascii(val).ljust(16),
+                )
+            )
             last = val
             skip = False
+
 
 def chexdump32(s, st=0, abbreviate=True, print_fn=print):
     last = None
     skip = False
-    for i in range(0,len(s),32):
-        val = s[i:i+32]
+    for i in range(0, len(s), 32):
+        val = s[i : i + 32]
         if val == last and abbreviate:
             if not skip:
                 print_fn("%08x  *" % (i + st))
                 skip = True
         else:
-            print_fn("%08x  %s" % (
-                i + st,
-                hexdump32(val, ' ')))
+            print_fn("%08x  %s" % (i + st, hexdump32(val, " ")))
             last = val
             skip = False
+
 
 def unhex(s):
     s = re.sub(r"/\*.*?\*/", "", s)
     return bytes.fromhex(s.replace(" ", "").replace("\n", ""))
 
+
 def dumpstacks(signal, frame):
     id2name = dict([(th.ident, th.name) for th in threading.enumerate()])
     code = []
     for threadId, stack in sys._current_frames().items():
-        code.append("\n# Thread: %s(%d)" % (id2name.get(threadId,""), threadId))
+        code.append("\n# Thread: %s(%d)" % (id2name.get(threadId, ""), threadId))
         for filename, lineno, name, line in traceback.extract_stack(stack):
             code.append('File: "%s", line %d, in %s' % (filename, lineno, name))
             if line:
@@ -221,8 +403,10 @@ def dumpstacks(signal, frame):
     print("\n".join(code))
     sys.exit(1)
 
+
 def set_sigquit_stackdump_handler():
     signal.signal(signal.SIGQUIT, dumpstacks)
+
 
 def parse_indexlist(s):
     items = set()
@@ -235,9 +419,13 @@ def parse_indexlist(s):
             items.add(int(i))
     return items
 
-FourCC = ExprAdapter(Int32ul,
-                     lambda d, ctx: d.to_bytes(4, "big").decode("latin-1"),
-                     lambda d, ctx: int.from_bytes(d.encode("latin-1"), "big"))
+
+FourCC = ExprAdapter(
+    Int32ul,
+    lambda d, ctx: d.to_bytes(4, "big").decode("latin-1"),
+    lambda d, ctx: int.from_bytes(d.encode("latin-1"), "big"),
+)
+
 
 class SafeGreedyRange(GreedyRange):
     def __init__(self, subcon, discard=False):
@@ -257,11 +445,13 @@ class SafeGreedyRange(GreedyRange):
             pass
         return obj
 
+
 class ReloadableMeta(type):
     def __new__(cls, name, bases, dct):
         m = super().__new__(cls, name, bases, dct)
         m._load_time = time.time()
         return m
+
 
 class Reloadable(metaclass=ReloadableMeta):
     @classmethod
@@ -281,7 +471,9 @@ class Reloadable(metaclass=ReloadableMeta):
             if not source:
                 continue
             newest = max(newest, os.stat(source).st_mtime, pcls._load_time)
-            if (force or reloaded or pcls._load_time < newest) and mod.__name__ not in reloaded:
+            if (
+                force or reloaded or pcls._load_time < newest
+            ) and mod.__name__ not in reloaded:
                 print(f"Reload: {mod.__name__}")
                 mod = importlib.reload(mod)
                 reloaded.add(mod.__name__)
@@ -291,6 +483,7 @@ class Reloadable(metaclass=ReloadableMeta):
     def _reloadme(self):
         self.__class__ = self._reloadcls()
 
+
 class Constant:
     def __init__(self, value):
         self.value = value
@@ -298,6 +491,7 @@ class Constant:
     def __call__(self, v):
         assert v == self.value
         return v
+
 
 class RegisterMeta(ReloadableMeta):
     def __new__(cls, name, bases, dct):
@@ -309,32 +503,48 @@ class RegisterMeta(ReloadableMeta):
             for cls in bases[0].mro():
                 if cls is Reloadable:
                     break
-                f.update({k: None for k,v in cls.__dict__.items()
-                          if not k.startswith("_") and isinstance(v, (int, tuple))})
+                f.update(
+                    {
+                        k: None
+                        for k, v in cls.__dict__.items()
+                        if not k.startswith("_") and isinstance(v, (int, tuple))
+                    }
+                )
 
-        f.update({k: None for k, v in dct.items()
-                 if not k.startswith("_") and isinstance(v, (int, tuple))})
+        f.update(
+            {
+                k: None
+                for k, v in dct.items()
+                if not k.startswith("_") and isinstance(v, (int, tuple))
+            }
+        )
 
         m._fields_list = list(f.keys())
         m._fields = set(f.keys())
 
         return m
 
+
 class Register(Reloadable, metaclass=RegisterMeta):
     _Constant = Constant
+
     def __init__(self, v=None, **kwargs):
         if v is not None:
             self._value = v
             for k in self._fields_list:
-                getattr(self, k) # validate
+                getattr(self, k)  # validate
         else:
             self._value = 0
             for k in self._fields_list:
                 field = getattr(self.__class__, k)
-                if isinstance(field, tuple) and len(field) >= 3 and isinstance(field[2], self._Constant):
+                if (
+                    isinstance(field, tuple)
+                    and len(field) >= 3
+                    and isinstance(field[2], self._Constant)
+                ):
                     setattr(self, k, field[2].value)
 
-        for k,v in kwargs.items():
+        for k, v in kwargs.items():
             setattr(self, k, v)
 
     def __getattribute__(self, attr):
@@ -372,7 +582,7 @@ class Register(Reloadable, metaclass=RegisterMeta):
                 msb, lsb = field
             else:
                 msb, lsb, ftype = field
-            mask = ((1 << ((msb + 1) - lsb)) - 1)
+            mask = (1 << ((msb + 1) - lsb)) - 1
             self._value = (value & ~(mask << lsb)) | ((fvalue & mask) << lsb)
         else:
             raise AttributeError(f"Invalid field definition {attr} = {field!r}")
@@ -408,7 +618,7 @@ class Register(Reloadable, metaclass=RegisterMeta):
         return {k: getattr(self, k) for k in self._fields_list}
 
     def str_fields(self):
-        return ', '.join(f'{k}={self._field_val(k)}' for k in self._fields_list)
+        return ", ".join(f"{k}={self._field_val(k)}" for k in self._fields_list)
 
     def __str__(self):
         return f"0x{self._value:x} ({self.str_fields()})"
@@ -422,21 +632,27 @@ class Register(Reloadable, metaclass=RegisterMeta):
     @property
     def value(self):
         return self._value
+
     @value.setter
     def value(self, val):
         self._value = val
 
+
 class Register8(Register):
     __WIDTH__ = 8
+
 
 class Register16(Register):
     __WIDTH__ = 16
 
+
 class Register32(Register):
     __WIDTH__ = 32
 
+
 class Register64(Register):
     __WIDTH__ = 64
+
 
 class RegAdapter(Adapter):
     def __init__(self, register):
@@ -459,6 +675,7 @@ class RegAdapter(Adapter):
 
     def _encode(self, obj, context, path):
         return obj.value
+
 
 class RangeMap(Reloadable):
     def __init__(self):
@@ -492,8 +709,10 @@ class RangeMap(Reloadable):
 
     def __zone(self, zone):
         if isinstance(zone, slice):
-            zone = range(zone.start if zone.start is not None else 0,
-                         zone.stop if zone.stop is not None else 1 << 64)
+            zone = range(
+                zone.start if zone.start is not None else 0,
+                zone.stop if zone.stop is not None else 1 << 64,
+            )
         elif isinstance(zone, int):
             zone = range(zone, zone + 1)
 
@@ -515,7 +734,10 @@ class RangeMap(Reloadable):
         return (range(s, e + 1) for s, e in zip(self.__start, self.__end))
 
     def items(self):
-        return ((range(s, e + 1), v) for s, e, v in zip(self.__start, self.__end, self.__value))
+        return (
+            (range(s, e + 1), v)
+            for s, e, v in zip(self.__start, self.__end, self.__value)
+        )
 
     def _overlap_range(self, zone, split=False):
         zone = self.__zone(zone)
@@ -639,13 +861,14 @@ class RangeMap(Reloadable):
 
         self.__start, self.__end, self.__value = new_s, new_e, new_v
 
-    def _assert(self, expect, val=lambda a:a):
+    def _assert(self, expect, val=lambda a: a):
         state = []
         for i, j, v in zip(self.__start, self.__end, self.__value):
             state.append((i, j, val(v)))
         if state != expect:
             print(f"Expected: {expect}")
             print(f"Got:      {state}")
+
 
 class AddrLookup(RangeMap):
     def __str__(self):
@@ -674,15 +897,16 @@ class AddrLookup(RangeMap):
             except:
                 pass
 
-    def lookup(self, addr, default='unknown'):
+    def lookup(self, addr, default="unknown"):
         maps = super().lookup(addr)
         return maps[0] if maps else (default, range(0, 1 << 64))
 
     def lookup_all(self, addr):
         return super().lookup(addr, [])
 
-    def _assert(self, expect, val=lambda a:a):
+    def _assert(self, expect, val=lambda a: a):
         super()._assert(expect, lambda v: [i[0] for i in v])
+
 
 class ScalarRangeMap(RangeMap):
     def get(self, addr, default=None):
@@ -700,6 +924,7 @@ class ScalarRangeMap(RangeMap):
             raise KeyError(f"Address {addr:#x} has no value")
         return value
 
+
 class BoolRangeMap(RangeMap):
     def set(self, zone):
         self.replace(zone, True)
@@ -709,6 +934,7 @@ class BoolRangeMap(RangeMap):
 
     def __getitem__(self, addr):
         return self.lookup(addr, False)
+
 
 class DictRangeMap(RangeMap):
     def __setitem__(self, k, value):
@@ -736,6 +962,7 @@ class DictRangeMap(RangeMap):
             values = self.lookup(k)
             return values or {}
 
+
 class SetRangeMap(RangeMap):
     def add(self, zone, key):
         for r, values in self.populate(zone, set()):
@@ -745,6 +972,7 @@ class SetRangeMap(RangeMap):
         for r, values in self.overlaps(zone, split=True):
             if values:
                 values.discard(key)
+
     remove = discard
 
     def __setitem__(self, k, value):
@@ -756,6 +984,7 @@ class SetRangeMap(RangeMap):
     def __getitem__(self, addr):
         values = super().lookup(addr)
         return frozenset(values) if values else frozenset()
+
 
 class NdRange:
     def __init__(self, rng, min_step=1):
@@ -800,7 +1029,11 @@ class NdRange:
             return sum((i[j] for i, j in zip(self.ranges, item)))
         else:
             iters = (i[j] for i, j in zip(self.ranges, item))
-            return map(sum, itertools.product(*(([i] if isinstance(i, int) else i) for i in iters)))
+            return map(
+                sum,
+                itertools.product(*(([i] if isinstance(i, int) else i) for i in iters)),
+            )
+
 
 class RegMapMeta(ReloadableMeta):
     def __new__(cls, name, bases, dct):
@@ -830,13 +1063,16 @@ class RegMapMeta(ReloadableMeta):
             def prop(k):
                 def getter(self):
                     return self._accessor[k]
+
                 def setter(self, val):
                     self._accessor[k].val = val
+
                 return property(getter, setter)
 
             setattr(m, k, prop(k))
 
         return m
+
 
 class RegAccessor(Reloadable):
     def __init__(self, cls, rd, wr, addr):
@@ -876,6 +1112,7 @@ class RegAccessor(Reloadable):
     def __str__(self):
         return str(self.reg)
 
+
 class RegArrayAccessor(Reloadable):
     def __init__(self, range, cls, rd, wr, addr):
         self.range = range
@@ -890,6 +1127,7 @@ class RegArrayAccessor(Reloadable):
             return RegAccessor(self.cls, self.rd, self.wr, self.addr + off)
         else:
             return [RegAccessor(self.cls, self.rd, self.wr, self.addr + i) for i in off]
+
 
 class BaseRegMap(Reloadable):
     def __init__(self, backend, base):
@@ -917,6 +1155,7 @@ class BaseRegMap(Reloadable):
                 if offset in rng:
                     return name, rng.index(offset), rcls
         return None, None, None
+
     lookup_offset = classmethod(_lookup_offset)
 
     def lookup_addr(self, addr):
@@ -931,6 +1170,7 @@ class BaseRegMap(Reloadable):
 
     def _lookup_name(cls, name):
         return cls._namemap.get(name, None)
+
     lookup_name = classmethod(_lookup_name)
 
     def _scalar_regs(self):
@@ -939,13 +1179,23 @@ class BaseRegMap(Reloadable):
 
     def _array_reg(self, zone, map):
         addrs, name, rtype = map
+
         def index(addr):
             idx = addrs.index(addr)
             if isinstance(idx, tuple):
                 idx = str(idx)[1:-1]
             return idx
-        reg = ((addr, f"{name}[{index(addr)}]", self._accessor[name][addrs.index(addr)], rtype)
-                     for addr in zone if addr in addrs)
+
+        reg = (
+            (
+                addr,
+                f"{name}[{index(addr)}]",
+                self._accessor[name][addrs.index(addr)],
+                rtype,
+            )
+            for addr in zone
+            if addr in addrs
+        )
         return reg
 
     def _array_regs(self):
@@ -953,14 +1203,19 @@ class BaseRegMap(Reloadable):
             yield from heapq.merge(*(self._array_reg(zone, map) for map in maps))
 
     def dump_regs(self):
-        for addr, name, acc, rtype in heapq.merge(sorted(self._scalar_regs()), self._array_regs()):
+        for addr, name, acc, rtype in heapq.merge(
+            sorted(self._scalar_regs()), self._array_regs()
+        ):
             print(f"{self._base:#x}+{addr:06x} {name} = {acc.reg}")
+
 
 class RegMap(BaseRegMap, metaclass=RegMapMeta):
     pass
 
+
 def irange(start, count, step=1):
     return range(start, start + count * step, step)
+
 
 # Table generated by:
 #
@@ -978,118 +1233,410 @@ def irange(start, count, step=1):
 #     print(f"{tbl[i]:#06x}, {tbl[i+1]:#06x}, {tbl[i+2]:#06x}, {tbl[i+3]:#06x}, {tbl[i+4]:#06x}, {tbl[i+5]:#06x}, {tbl[i+6]:#06x}, {tbl[i+7]:#06x}, ")
 
 _crc16_table = [
-    0x0000, 0xc0c1, 0xc181, 0x0140, 0xc301, 0x03c0, 0x0280, 0xc241,
-    0xc601, 0x06c0, 0x0780, 0xc741, 0x0500, 0xc5c1, 0xc481, 0x0440,
-    0xcc01, 0x0cc0, 0x0d80, 0xcd41, 0x0f00, 0xcfc1, 0xce81, 0x0e40,
-    0x0a00, 0xcac1, 0xcb81, 0x0b40, 0xc901, 0x09c0, 0x0880, 0xc841,
-    0xd801, 0x18c0, 0x1980, 0xd941, 0x1b00, 0xdbc1, 0xda81, 0x1a40,
-    0x1e00, 0xdec1, 0xdf81, 0x1f40, 0xdd01, 0x1dc0, 0x1c80, 0xdc41,
-    0x1400, 0xd4c1, 0xd581, 0x1540, 0xd701, 0x17c0, 0x1680, 0xd641,
-    0xd201, 0x12c0, 0x1380, 0xd341, 0x1100, 0xd1c1, 0xd081, 0x1040,
-    0xf001, 0x30c0, 0x3180, 0xf141, 0x3300, 0xf3c1, 0xf281, 0x3240,
-    0x3600, 0xf6c1, 0xf781, 0x3740, 0xf501, 0x35c0, 0x3480, 0xf441,
-    0x3c00, 0xfcc1, 0xfd81, 0x3d40, 0xff01, 0x3fc0, 0x3e80, 0xfe41,
-    0xfa01, 0x3ac0, 0x3b80, 0xfb41, 0x3900, 0xf9c1, 0xf881, 0x3840,
-    0x2800, 0xe8c1, 0xe981, 0x2940, 0xeb01, 0x2bc0, 0x2a80, 0xea41,
-    0xee01, 0x2ec0, 0x2f80, 0xef41, 0x2d00, 0xedc1, 0xec81, 0x2c40,
-    0xe401, 0x24c0, 0x2580, 0xe541, 0x2700, 0xe7c1, 0xe681, 0x2640,
-    0x2200, 0xe2c1, 0xe381, 0x2340, 0xe101, 0x21c0, 0x2080, 0xe041,
-    0xa001, 0x60c0, 0x6180, 0xa141, 0x6300, 0xa3c1, 0xa281, 0x6240,
-    0x6600, 0xa6c1, 0xa781, 0x6740, 0xa501, 0x65c0, 0x6480, 0xa441,
-    0x6c00, 0xacc1, 0xad81, 0x6d40, 0xaf01, 0x6fc0, 0x6e80, 0xae41,
-    0xaa01, 0x6ac0, 0x6b80, 0xab41, 0x6900, 0xa9c1, 0xa881, 0x6840,
-    0x7800, 0xb8c1, 0xb981, 0x7940, 0xbb01, 0x7bc0, 0x7a80, 0xba41,
-    0xbe01, 0x7ec0, 0x7f80, 0xbf41, 0x7d00, 0xbdc1, 0xbc81, 0x7c40,
-    0xb401, 0x74c0, 0x7580, 0xb541, 0x7700, 0xb7c1, 0xb681, 0x7640,
-    0x7200, 0xb2c1, 0xb381, 0x7340, 0xb101, 0x71c0, 0x7080, 0xb041,
-    0x5000, 0x90c1, 0x9181, 0x5140, 0x9301, 0x53c0, 0x5280, 0x9241,
-    0x9601, 0x56c0, 0x5780, 0x9741, 0x5500, 0x95c1, 0x9481, 0x5440,
-    0x9c01, 0x5cc0, 0x5d80, 0x9d41, 0x5f00, 0x9fc1, 0x9e81, 0x5e40,
-    0x5a00, 0x9ac1, 0x9b81, 0x5b40, 0x9901, 0x59c0, 0x5880, 0x9841,
-    0x8801, 0x48c0, 0x4980, 0x8941, 0x4b00, 0x8bc1, 0x8a81, 0x4a40,
-    0x4e00, 0x8ec1, 0x8f81, 0x4f40, 0x8d01, 0x4dc0, 0x4c80, 0x8c41,
-    0x4400, 0x84c1, 0x8581, 0x4540, 0x8701, 0x47c0, 0x4680, 0x8641,
-    0x8201, 0x42c0, 0x4380, 0x8341, 0x4100, 0x81c1, 0x8081, 0x4040
+    0x0000,
+    0xC0C1,
+    0xC181,
+    0x0140,
+    0xC301,
+    0x03C0,
+    0x0280,
+    0xC241,
+    0xC601,
+    0x06C0,
+    0x0780,
+    0xC741,
+    0x0500,
+    0xC5C1,
+    0xC481,
+    0x0440,
+    0xCC01,
+    0x0CC0,
+    0x0D80,
+    0xCD41,
+    0x0F00,
+    0xCFC1,
+    0xCE81,
+    0x0E40,
+    0x0A00,
+    0xCAC1,
+    0xCB81,
+    0x0B40,
+    0xC901,
+    0x09C0,
+    0x0880,
+    0xC841,
+    0xD801,
+    0x18C0,
+    0x1980,
+    0xD941,
+    0x1B00,
+    0xDBC1,
+    0xDA81,
+    0x1A40,
+    0x1E00,
+    0xDEC1,
+    0xDF81,
+    0x1F40,
+    0xDD01,
+    0x1DC0,
+    0x1C80,
+    0xDC41,
+    0x1400,
+    0xD4C1,
+    0xD581,
+    0x1540,
+    0xD701,
+    0x17C0,
+    0x1680,
+    0xD641,
+    0xD201,
+    0x12C0,
+    0x1380,
+    0xD341,
+    0x1100,
+    0xD1C1,
+    0xD081,
+    0x1040,
+    0xF001,
+    0x30C0,
+    0x3180,
+    0xF141,
+    0x3300,
+    0xF3C1,
+    0xF281,
+    0x3240,
+    0x3600,
+    0xF6C1,
+    0xF781,
+    0x3740,
+    0xF501,
+    0x35C0,
+    0x3480,
+    0xF441,
+    0x3C00,
+    0xFCC1,
+    0xFD81,
+    0x3D40,
+    0xFF01,
+    0x3FC0,
+    0x3E80,
+    0xFE41,
+    0xFA01,
+    0x3AC0,
+    0x3B80,
+    0xFB41,
+    0x3900,
+    0xF9C1,
+    0xF881,
+    0x3840,
+    0x2800,
+    0xE8C1,
+    0xE981,
+    0x2940,
+    0xEB01,
+    0x2BC0,
+    0x2A80,
+    0xEA41,
+    0xEE01,
+    0x2EC0,
+    0x2F80,
+    0xEF41,
+    0x2D00,
+    0xEDC1,
+    0xEC81,
+    0x2C40,
+    0xE401,
+    0x24C0,
+    0x2580,
+    0xE541,
+    0x2700,
+    0xE7C1,
+    0xE681,
+    0x2640,
+    0x2200,
+    0xE2C1,
+    0xE381,
+    0x2340,
+    0xE101,
+    0x21C0,
+    0x2080,
+    0xE041,
+    0xA001,
+    0x60C0,
+    0x6180,
+    0xA141,
+    0x6300,
+    0xA3C1,
+    0xA281,
+    0x6240,
+    0x6600,
+    0xA6C1,
+    0xA781,
+    0x6740,
+    0xA501,
+    0x65C0,
+    0x6480,
+    0xA441,
+    0x6C00,
+    0xACC1,
+    0xAD81,
+    0x6D40,
+    0xAF01,
+    0x6FC0,
+    0x6E80,
+    0xAE41,
+    0xAA01,
+    0x6AC0,
+    0x6B80,
+    0xAB41,
+    0x6900,
+    0xA9C1,
+    0xA881,
+    0x6840,
+    0x7800,
+    0xB8C1,
+    0xB981,
+    0x7940,
+    0xBB01,
+    0x7BC0,
+    0x7A80,
+    0xBA41,
+    0xBE01,
+    0x7EC0,
+    0x7F80,
+    0xBF41,
+    0x7D00,
+    0xBDC1,
+    0xBC81,
+    0x7C40,
+    0xB401,
+    0x74C0,
+    0x7580,
+    0xB541,
+    0x7700,
+    0xB7C1,
+    0xB681,
+    0x7640,
+    0x7200,
+    0xB2C1,
+    0xB381,
+    0x7340,
+    0xB101,
+    0x71C0,
+    0x7080,
+    0xB041,
+    0x5000,
+    0x90C1,
+    0x9181,
+    0x5140,
+    0x9301,
+    0x53C0,
+    0x5280,
+    0x9241,
+    0x9601,
+    0x56C0,
+    0x5780,
+    0x9741,
+    0x5500,
+    0x95C1,
+    0x9481,
+    0x5440,
+    0x9C01,
+    0x5CC0,
+    0x5D80,
+    0x9D41,
+    0x5F00,
+    0x9FC1,
+    0x9E81,
+    0x5E40,
+    0x5A00,
+    0x9AC1,
+    0x9B81,
+    0x5B40,
+    0x9901,
+    0x59C0,
+    0x5880,
+    0x9841,
+    0x8801,
+    0x48C0,
+    0x4980,
+    0x8941,
+    0x4B00,
+    0x8BC1,
+    0x8A81,
+    0x4A40,
+    0x4E00,
+    0x8EC1,
+    0x8F81,
+    0x4F40,
+    0x8D01,
+    0x4DC0,
+    0x4C80,
+    0x8C41,
+    0x4400,
+    0x84C1,
+    0x8581,
+    0x4540,
+    0x8701,
+    0x47C0,
+    0x4680,
+    0x8641,
+    0x8201,
+    0x42C0,
+    0x4380,
+    0x8341,
+    0x4100,
+    0x81C1,
+    0x8081,
+    0x4040,
 ]
+
 
 def crc16USB(crc, data):
     for x in data:
-        crc = (crc >> 8) ^ _crc16_table[(crc ^ x) & 0xff]
+        crc = (crc >> 8) ^ _crc16_table[(crc ^ x) & 0xFF]
     return crc
 
-__all__.extend(k for k, v in globals().items()
-               if (callable(v) or isinstance(v, type)) and v.__module__ == __name__)
+
+__all__.extend(
+    k
+    for k, v in globals().items()
+    if (callable(v) or isinstance(v, type)) and v.__module__ == __name__
+)
 
 if __name__ == "__main__":
     # AddrLookup test
     a = AddrLookup()
     a.add(range(0, 10), 0)
-    a._assert([
-        (0, 9, [0])
-    ])
+    a._assert([(0, 9, [0])])
     a.add(range(10, 20), 1)
-    a._assert([
-        (0, 9, [0]), (10, 19, [1])
-    ])
+    a._assert([(0, 9, [0]), (10, 19, [1])])
     a.add(range(20, 25), 2)
-    a._assert([
-        (0, 9, [0]), (10, 19, [1]), (20, 24, [2])
-    ])
+    a._assert([(0, 9, [0]), (10, 19, [1]), (20, 24, [2])])
     a.add(range(30, 40), 3)
-    a._assert([
-        (0, 9, [0]), (10, 19, [1]), (20, 24, [2]), (30, 39, [3])
-    ])
+    a._assert([(0, 9, [0]), (10, 19, [1]), (20, 24, [2]), (30, 39, [3])])
     a.add(range(0, 15), 4)
-    a._assert([
-        (0, 9, [0, 4]), (10, 14, [1, 4]), (15, 19, [1]), (20, 24, [2]), (30, 39, [3])
-    ])
+    a._assert(
+        [(0, 9, [0, 4]), (10, 14, [1, 4]), (15, 19, [1]), (20, 24, [2]), (30, 39, [3])]
+    )
     a.add(range(0, 15), 5)
-    a._assert([
-        (0, 9, [0, 4, 5]), (10, 14, [1, 4, 5]), (15, 19, [1]), (20, 24, [2]), (30, 39, [3])
-    ])
+    a._assert(
+        [
+            (0, 9, [0, 4, 5]),
+            (10, 14, [1, 4, 5]),
+            (15, 19, [1]),
+            (20, 24, [2]),
+            (30, 39, [3]),
+        ]
+    )
     a.add(range(21, 44), 6)
-    a._assert([
-        (0, 9, [0, 4, 5]), (10, 14, [1, 4, 5]), (15, 19, [1]), (20, 20, [2]), (21, 24, [2, 6]),
-        (25, 29, [6]), (30, 39, [3, 6]), (40, 43, [6])
-    ])
+    a._assert(
+        [
+            (0, 9, [0, 4, 5]),
+            (10, 14, [1, 4, 5]),
+            (15, 19, [1]),
+            (20, 20, [2]),
+            (21, 24, [2, 6]),
+            (25, 29, [6]),
+            (30, 39, [3, 6]),
+            (40, 43, [6]),
+        ]
+    )
     a.add(range(70, 80), 7)
-    a._assert([
-        (0, 9, [0, 4, 5]), (10, 14, [1, 4, 5]), (15, 19, [1]), (20, 20, [2]), (21, 24, [2, 6]),
-        (25, 29, [6]), (30, 39, [3, 6]), (40, 43, [6]), (70, 79, [7])
-    ])
+    a._assert(
+        [
+            (0, 9, [0, 4, 5]),
+            (10, 14, [1, 4, 5]),
+            (15, 19, [1]),
+            (20, 20, [2]),
+            (21, 24, [2, 6]),
+            (25, 29, [6]),
+            (30, 39, [3, 6]),
+            (40, 43, [6]),
+            (70, 79, [7]),
+        ]
+    )
     a.add(range(0, 100), 8)
-    a._assert([
-        (0, 9, [0, 4, 5, 8]), (10, 14, [1, 4, 5, 8]), (15, 19, [1, 8]), (20, 20, [2, 8]),
-        (21, 24, [2, 6, 8]), (25, 29, [6, 8]), (30, 39, [3, 6, 8]), (40, 43, [6, 8]),
-        (44, 69, [8]), (70, 79, [7, 8]), (80, 99, [8])
-    ])
+    a._assert(
+        [
+            (0, 9, [0, 4, 5, 8]),
+            (10, 14, [1, 4, 5, 8]),
+            (15, 19, [1, 8]),
+            (20, 20, [2, 8]),
+            (21, 24, [2, 6, 8]),
+            (25, 29, [6, 8]),
+            (30, 39, [3, 6, 8]),
+            (40, 43, [6, 8]),
+            (44, 69, [8]),
+            (70, 79, [7, 8]),
+            (80, 99, [8]),
+        ]
+    )
     a.remove(range(21, 44), 6)
-    a._assert([
-        (0, 9, [0, 4, 5, 8]), (10, 14, [1, 4, 5, 8]), (15, 19, [1, 8]), (20, 20, [2, 8]),
-        (21, 24, [2, 8]), (25, 29, [8]), (30, 39, [3, 8]), (40, 43, [8]),
-        (44, 69, [8]), (70, 79, [7, 8]), (80, 99, [8])
-    ])
+    a._assert(
+        [
+            (0, 9, [0, 4, 5, 8]),
+            (10, 14, [1, 4, 5, 8]),
+            (15, 19, [1, 8]),
+            (20, 20, [2, 8]),
+            (21, 24, [2, 8]),
+            (25, 29, [8]),
+            (30, 39, [3, 8]),
+            (40, 43, [8]),
+            (44, 69, [8]),
+            (70, 79, [7, 8]),
+            (80, 99, [8]),
+        ]
+    )
     a.compact()
-    a._assert([
-        (0, 9, [0, 4, 5, 8]), (10, 14, [1, 4, 5, 8]), (15, 19, [1, 8]), (20, 24, [2, 8]),
-        (25, 29, [8]), (30, 39, [3, 8]), (40, 69, [8]), (70, 79, [7, 8]),
-        (80, 99, [8])
-    ])
+    a._assert(
+        [
+            (0, 9, [0, 4, 5, 8]),
+            (10, 14, [1, 4, 5, 8]),
+            (15, 19, [1, 8]),
+            (20, 24, [2, 8]),
+            (25, 29, [8]),
+            (30, 39, [3, 8]),
+            (40, 69, [8]),
+            (70, 79, [7, 8]),
+            (80, 99, [8]),
+        ]
+    )
     a.remove(range(0, 100), 8)
-    a._assert([
-        (0, 9, [0, 4, 5]), (10, 14, [1, 4, 5]), (15, 19, [1]), (20, 24, [2]), (25, 29, []),
-        (30, 39, [3]), (40, 69, []), (70, 79, [7]), (80, 99, [])
-    ])
+    a._assert(
+        [
+            (0, 9, [0, 4, 5]),
+            (10, 14, [1, 4, 5]),
+            (15, 19, [1]),
+            (20, 24, [2]),
+            (25, 29, []),
+            (30, 39, [3]),
+            (40, 69, []),
+            (70, 79, [7]),
+            (80, 99, []),
+        ]
+    )
     a.compact()
-    a._assert([
-        (0, 9, [0, 4, 5]), (10, 14, [1, 4, 5]), (15, 19, [1]), (20, 24, [2]), (30, 39, [3]),
-        (70, 79, [7])
-    ])
+    a._assert(
+        [
+            (0, 9, [0, 4, 5]),
+            (10, 14, [1, 4, 5]),
+            (15, 19, [1]),
+            (20, 24, [2]),
+            (30, 39, [3]),
+            (70, 79, [7]),
+        ]
+    )
     a.clear(range(12, 21))
-    a._assert([
-        (0, 9, [0, 4, 5]), (10, 11, [1, 4, 5]), (21, 24, [2]), (30, 39, [3]),
-        (70, 79, [7])
-    ])
+    a._assert(
+        [
+            (0, 9, [0, 4, 5]),
+            (10, 11, [1, 4, 5]),
+            (21, 24, [2]),
+            (30, 39, [3]),
+            (70, 79, [7]),
+        ]
+    )
 
     # ScalarRangeMap test
     a = ScalarRangeMap()
@@ -1098,7 +1645,7 @@ if __name__ == "__main__":
     a[4:8] = 3
     del a[2:4]
     expect = [1, 1, None, None, 3, 3, 3, 3, 2, 2, None]
-    for i,j in enumerate(expect):
+    for i, j in enumerate(expect):
         assert a.get(i) == j
         if j is not None:
             assert a[i] == j
@@ -1115,22 +1662,53 @@ if __name__ == "__main__":
     a[5:8, 1] = 11
     a[4:6, 2] = 12
     del a[2:4]
-    expect = [{0: 10}, {0: 10}, {}, {}, {0: 10, 2: 12}, {1: 11, 2: 12}, {1: 11}, {1: 11}, {}]
-    for i,j in enumerate(expect):
+    expect = [
+        {0: 10},
+        {0: 10},
+        {},
+        {},
+        {0: 10, 2: 12},
+        {1: 11, 2: 12},
+        {1: 11},
+        {1: 11},
+        {},
+    ]
+    for i, j in enumerate(expect):
         assert a[i] == j
         for k, v in j.items():
             assert a[i, k] == v
 
     # SetRangeMap test
     a = SetRangeMap()
-    a[0:2] = {1,}
-    a[2:7] = {2,}
+    a[0:2] = {
+        1,
+    }
+    a[2:7] = {
+        2,
+    }
     a.add(range(1, 4), 3)
     a.discard(0, -1)
     a.discard(3, 2)
     del a[4]
-    expect = [{1,}, {1,3}, {2,3}, {3,}, set(), {2,}, {2,}, set()]
-    for i,j in enumerate(expect):
+    expect = [
+        {
+            1,
+        },
+        {1, 3},
+        {2, 3},
+        {
+            3,
+        },
+        set(),
+        {
+            2,
+        },
+        {
+            2,
+        },
+        set(),
+    ]
+    for i, j in enumerate(expect):
         assert a[i] == j
 
     # BoolRangeMap test
@@ -1140,5 +1718,5 @@ if __name__ == "__main__":
     a.set(range(5, 5))
     a.clear(range(3, 5))
     expect = [True, True, False, False, False, True, False]
-    for i,j in enumerate(expect):
+    for i, j in enumerate(expect):
         assert a[i] == j

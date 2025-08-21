@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
+
 import serial
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
-import argparse, pathlib
+import argparse
+import pathlib
 
 from m1n1 import adt
 
-parser = argparse.ArgumentParser(description='Convert ADT PMGR nodes to Device Tree format')
+parser = argparse.ArgumentParser(
+    description="Convert ADT PMGR nodes to Device Tree format"
+)
 parser.add_argument("-m", "--multidie", action="store_true")
-parser.add_argument('input', type=pathlib.Path)
+parser.add_argument("input", type=pathlib.Path)
 args = parser.parse_args()
 
 adt_data = args.input.read_bytes()
@@ -23,17 +29,20 @@ dev_by_id = {dt.pmgr_dev_get_id(dev): dev for dev in pmgr.devices}
 blocks = {}
 maxaddr = {}
 
+
 def die_node(s):
     if args.multidie:
         return f"DIE_NODE({s})"
     else:
         return s
 
+
 def die_label(s):
     if args.multidie:
         return f"DIE_LABEL({s})"
     else:
         return s
+
 
 for i, dev in enumerate(pmgr.devices):
     if dev.flags.no_ps:
@@ -50,21 +59,23 @@ ps_compatible = f'"apple,{pmgr_compat}-pmgr-pwrstate", "apple,pmgr-pwrstate"'
 
 for i, ((base, size), devices) in enumerate(sorted(blocks.items())):
 
-    size = min(size, (maxaddr[base] + 0x3fff) & ~0x3fff)
+    size = min(size, (maxaddr[base] + 0x3FFF) & ~0x3FFF)
 
     print(f"pmgr{i}: power-management@{base:x} {{")
     print(f"\tcompatible = {compatible};")
-    print( "\t#address-cells = <1>;")
-    print( "\t#size-cells = <1>;")
+    print("\t#address-cells = <1>;")
+    print("\t#size-cells = <1>;")
     print()
     print(f"\treg = <{base >> 32:#x} {base & 0xffffffff:#x} 0 {size:#x}>;")
-    print( "};")
+    print("};")
     print()
 
 for i, ((base, size), devices) in enumerate(sorted(blocks.items())):
     print(f"&pmgr{i} {{")
 
-    for dev in sorted(devices, key=lambda d: pmgr.ps_regs[d.psreg].offset + dev.psidx * 8):
+    for dev in sorted(
+        devices, key=lambda d: pmgr.ps_regs[d.psreg].offset + dev.psidx * 8
+    ):
         if dev.flags.no_ps:
             continue
 
@@ -77,16 +88,20 @@ for i, ((base, size), devices) in enumerate(sorted(blocks.items())):
         print(f"\t{die_node('ps_' + dev.name.lower())}: power-controller@{offset:x} {{")
         print(f"\t\tcompatible = {ps_compatible};")
         print(f"\t\treg = <{offset:#x} 4>;")
-        print( "\t\t#power-domain-cells = <0>;")
-        print( "\t\t#reset-cells = <0>;")
-        print(f'\t\tlabel = {die_label(dev.name.lower())};')
+        print("\t\t#power-domain-cells = <0>;")
+        print("\t\t#reset-cells = <0>;")
+        print(f"\t\tlabel = {die_label(dev.name.lower())};")
         if dev.flags.critical:
             print("\t\tapple,always-on;")
 
         if any(dt.pmgr_dev_get_parents(dev)):
-            domains = [f"<&{die_node('ps_'+dev_by_id[idx].name.lower())}>" for idx in dt.pmgr_dev_get_parents(dev) if idx]
+            domains = [
+                f"<&{die_node('ps_'+dev_by_id[idx].name.lower())}>"
+                for idx in dt.pmgr_dev_get_parents(dev)
+                if idx
+            ]
             print(f"\t\tpower-domains = {', '.join(domains)};")
 
-        print( "\t};")
-    print( "};")
+        print("\t};")
+    print("};")
     print()

@@ -2,43 +2,49 @@
 import struct
 
 from ..utils import *
-
 from .asc import StandardASC
 from .asc.base import *
 
-SMC_READ_KEY           = 0x10
-SMC_WRITE_KEY          = 0x11
-SMC_GET_KEY_BY_INDEX   = 0x12
-SMC_GET_KEY_INFO       = 0x13
-SMC_INITIALIZE         = 0x17
-SMC_NOTIFICATION       = 0x18
-SMC_RW_KEY             = 0x20
+SMC_READ_KEY = 0x10
+SMC_WRITE_KEY = 0x11
+SMC_GET_KEY_BY_INDEX = 0x12
+SMC_GET_KEY_INFO = 0x13
+SMC_INITIALIZE = 0x17
+SMC_NOTIFICATION = 0x18
+SMC_RW_KEY = 0x20
+
 
 class SMCMessage(Register64):
     TYPE = 7, 0
     UNK = 11, 8, Constant(0)
     ID = 15, 12
 
+
 class SMCInitialize(SMCMessage):
     TYPE = 7, 0, Constant(SMC_INITIALIZE)
+
 
 class SMCGetKeyInfo(SMCMessage):
     TYPE = 7, 0, Constant(SMC_GET_KEY_INFO)
     KEY = 63, 32
 
+
 class SMCGetKeyByIndex(SMCMessage):
     TYPE = 7, 0, Constant(SMC_GET_KEY_BY_INDEX)
     INDEX = 63, 32
+
 
 class SMCWriteKey(SMCMessage):
     TYPE = 7, 0, Constant(SMC_WRITE_KEY)
     SIZE = 23, 16
     KEY = 63, 32
 
+
 class SMCReadKey(SMCMessage):
     TYPE = 7, 0, Constant(SMC_READ_KEY)
     SIZE = 23, 16
     KEY = 63, 32
+
 
 class SMCReadWriteKey(SMCMessage):
     TYPE = 7, 0, Constant(SMC_RW_KEY)
@@ -46,14 +52,17 @@ class SMCReadWriteKey(SMCMessage):
     WSIZE = 31, 24
     KEY = 63, 32
 
+
 class SMCResult(Register64):
     RESULT = 7, 0
     ID = 15, 12
     SIZE = 31, 16
     VALUE = 63, 32
 
+
 class SMCError(Exception):
     pass
+
 
 class SMCEndpoint(ASCBaseEndpoint):
     BASE_MESSAGE = SMCMessage
@@ -82,15 +91,15 @@ class SMCEndpoint(ASCBaseEndpoint):
         self.ret = {}
 
     def start(self):
-        self.send(SMCInitialize(ID = 0))
-        self.msgid += 1 # important!
+        self.send(SMCInitialize(ID=0))
+        self.msgid += 1  # important!
         while self.shmem is None:
             self.asc.work()
 
     def new_msgid(self):
-        mid = (self.msgid & 0xF)
+        mid = self.msgid & 0xF
         self.msgid += 1
-        assert(mid not in self.outstanding)
+        assert mid not in self.outstanding
         self.outstanding.add(mid)
         return mid
 
@@ -107,11 +116,11 @@ class SMCEndpoint(ASCBaseEndpoint):
     def write(self, key, data):
         key = int.from_bytes(key.encode("ascii"), byteorder="big")
         self.asc.iface.writemem(self.shmem, data)
-        self.cmd(SMCWriteKey(KEY = key, SIZE = len(data)))
+        self.cmd(SMCWriteKey(KEY=key, SIZE=len(data)))
 
     def read(self, key, size):
         key = int.from_bytes(key.encode("ascii"), byteorder="big")
-        ret = self.cmd(SMCReadKey(KEY = key, SIZE = size))
+        ret = self.cmd(SMCReadKey(KEY=key, SIZE=size))
         if size <= 4:
             return struct.pack("<I", ret.VALUE)[:size]
         else:
@@ -127,13 +136,13 @@ class SMCEndpoint(ASCBaseEndpoint):
             return self.asc.iface.readmem(self.shmem, ret.SIZE)
 
     def get_key_by_index(self, index):
-        ret = self.cmd(SMCGetKeyByIndex(INDEX = index))
+        ret = self.cmd(SMCGetKeyByIndex(INDEX=index))
         key = ret.VALUE.to_bytes(4, byteorder="little").decode("ascii")
         return key
 
     def get_key_info(self, key):
         key = int.from_bytes(key.encode("ascii"), byteorder="big")
-        ret = self.cmd(SMCGetKeyInfo(KEY = key))
+        ret = self.cmd(SMCGetKeyInfo(KEY=key))
         info = self.asc.iface.readmem(self.shmem, 6)
         length, type, flags = struct.unpack("B4sB", info)
         return length, type.decode("ascii"), flags
@@ -193,11 +202,12 @@ class SMCEndpoint(ASCBaseEndpoint):
             if ret == SMC_NOTIFICATION:
                 self.log(f"Notification: {msg.VALUE:#x}")
                 return True
-            #print(f"msg {mid} return value {ret}")
+            # print(f"msg {mid} return value {ret}")
             self.outstanding.discard(mid)
             self.ret[mid] = msg
 
         return True
+
 
 class SMCClient(StandardASC):
     ENDPOINTS = {

@@ -25,29 +25,34 @@ __all__ = ["DockChannel"]
 # 44000 : Data regs (2B)
 # (possibly more)
 
+
 class R_RX_DATA(Register32):
-    DATA        = 31, 8
-    COUNT       = 7, 0
+    DATA = 31, 8
+    COUNT = 7, 0
+
 
 class DockChannelIRQRegs(RegMap):
-    IRQ_MASK    = 0x0, Register32
-    IRQ_FLAG    = 0x4, Register32
+    IRQ_MASK = 0x0, Register32
+    IRQ_FLAG = 0x4, Register32
+
 
 class DockChannelConfigRegs(RegMap):
-    TX_THRESH   = 0x0, Register32
-    RX_THRESH   = 0x4, Register32
+    TX_THRESH = 0x0, Register32
+    RX_THRESH = 0x4, Register32
+
 
 class DockChannelDataRegs(RegMap):
-    TX_8        = 0x4, Register32
-    TX_16       = 0x8, Register32
-    TX_24       = 0xc, Register32
-    TX_32       = 0x10, Register32
-    TX_FREE     = 0x14, Register32
-    RX_8        = 0x1c, R_RX_DATA
-    RX_16       = 0x20, R_RX_DATA
-    RX_24       = 0x24, R_RX_DATA
-    RX_32       = 0x28, Register32
-    RX_COUNT    = 0x2c, Register32
+    TX_8 = 0x4, Register32
+    TX_16 = 0x8, Register32
+    TX_24 = 0xC, Register32
+    TX_32 = 0x10, Register32
+    TX_FREE = 0x14, Register32
+    RX_8 = 0x1C, R_RX_DATA
+    RX_16 = 0x20, R_RX_DATA
+    RX_24 = 0x24, R_RX_DATA
+    RX_32 = 0x28, Register32
+    RX_COUNT = 0x2C, Register32
+
 
 class DockChannel:
     def __init__(self, u, irq_base, fifo_base, irq_idx):
@@ -90,7 +95,7 @@ class DockChannel:
         while left >= 4:
             while self.tx_free < 4:
                 pass
-            d = struct.unpack("<I", data[p:p+4])[0]
+            d = struct.unpack("<I", data[p : p + 4])[0]
             self.data.TX_32.val = d
             p += 4
             left -= 4

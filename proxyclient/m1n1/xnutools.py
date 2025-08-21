@@ -1,26 +1,28 @@
 # SPDX-License-Identifier: MIT
 import re
+
 from construct import *
 
 __all__ = []
 
 DebuggerState = Struct(
-    "panic_options"             / Hex(Int64ul),
-    "current_op"                / Hex(Int32ul),
-    "proceed_on_sync_failure"   / Int32ul,
-    "message"                   / Hex(Int64ul),
-    "panic_str"                 / Hex(Int64ul),
-    "panic_args"                / Hex(Int64ul),
-    "panic_data_ptr"            / Hex(Int64ul),
-    "panic_caller"              / Hex(Int64ul),
-    "entry_count"               / Hex(Int32ul),
-    "kern_return"               / Hex(Int32sl)
+    "panic_options" / Hex(Int64ul),
+    "current_op" / Hex(Int32ul),
+    "proceed_on_sync_failure" / Int32ul,
+    "message" / Hex(Int64ul),
+    "panic_str" / Hex(Int64ul),
+    "panic_args" / Hex(Int64ul),
+    "panic_data_ptr" / Hex(Int64ul),
+    "panic_caller" / Hex(Int64ul),
+    "entry_count" / Hex(Int32ul),
+    "kern_return" / Hex(Int32sl),
 )
 
 # Darwin va_list is just a stack pointer...
 VaList = Struct(
     "stack" / Hex(Int64ul),
 )
+
 
 def decode_debugger_state(u, ctx):
     p = u.proxy
@@ -44,8 +46,10 @@ def decode_debugger_state(u, ctx):
     decode_panic(u, di.panic_str, di.panic_args)
     print("========================")
 
+
 def decode_panic_call(u, ctx):
     decode_panic(u, ctx.regs[0], ctx.regs[1])
+
 
 def decode_panic(u, p_string, p_args):
     p = u.proxy
@@ -90,7 +94,7 @@ def decode_panic(u, p_string, p_args):
         "t": Int64sl,
     }
 
-    #print(string)
+    # print(string)
 
     def format_arg(match):
         pat, flags, width, mod, conv = match.group(0, 1, 2, 3, 4)
@@ -109,9 +113,16 @@ def decode_panic(u, p_string, p_args):
         else:
             return f"[{pat!r}:{va_arg(Int64ul):x}]"
 
-    string = re.sub('%([-#0 +]*)([1-9][0-9]*)?(hh|h|l|ll|q|L|j|z|Z|t)?([diouxXeEfFgGaAcsCSpnm%])',
-                    format_arg, string)
+    string = re.sub(
+        "%([-#0 +]*)([1-9][0-9]*)?(hh|h|l|ll|q|L|j|z|Z|t)?([diouxXeEfFgGaAcsCSpnm%])",
+        format_arg,
+        string,
+    )
     print(string + "\n", end="")
 
-__all__.extend(k for k, v in globals().items()
-               if (callable(v) or isinstance(v, type)) and v.__module__ == __name__)
+
+__all__.extend(
+    k
+    for k, v in globals().items()
+    if (callable(v) or isinstance(v, type)) and v.__module__ == __name__
+)

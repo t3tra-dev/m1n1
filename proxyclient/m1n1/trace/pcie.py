@@ -1,24 +1,27 @@
-from . import Tracer, TraceMode
 from ..utils import *
+from . import TraceMode, Tracer
+
 
 class R_BAR(Register32):
-    BASE        = 31, 4
-    PREFETCH    = 3
-    ADDR64      = 2
-    BELOW_1M    = 1
-    SPACE       = 0
+    BASE = 31, 4
+    PREFETCH = 3
+    ADDR64 = 2
+    BELOW_1M = 1
+    SPACE = 0
+
 
 class PCICfgSpace(RegMap):
-    VENDOR_ID   = 0x00, Register16
-    PRODUCT_ID  = 0x02, Register16
-    COMMAND     = 0x04, Register16
-    STATUS      = 0x06, Register16
-    REV_CLASS   = 0x08, Register32
-    HDR_TYPE    = 0x0e, Register8
+    VENDOR_ID = 0x00, Register16
+    PRODUCT_ID = 0x02, Register16
+    COMMAND = 0x04, Register16
+    STATUS = 0x06, Register16
+    REV_CLASS = 0x08, Register32
+    HDR_TYPE = 0x0E, Register8
 
-    BAR         = irange(0x10, 6, 4), R_BAR
-    ROMADDR     = 0x30, Register32
-    CAP_PTR     = 0x34, Register32
+    BAR = irange(0x10, 6, 4), R_BAR
+    ROMADDR = 0x30, Register32
+    CAP_PTR = 0x34, Register32
+
 
 class PCIeDevTracer(Tracer):
     CFGMAP = PCICfgSpace
@@ -27,7 +30,11 @@ class PCIeDevTracer(Tracer):
     PREFIXES = []
 
     def __init__(self, hv, apcie, bus, dev, fn, verbose=False):
-        super().__init__(hv, verbose=verbose, ident=f"{type(self).__name__}@{apcie}/{bus:02x}:{dev:02x}.{fn:1x}")
+        super().__init__(
+            hv,
+            verbose=verbose,
+            ident=f"{type(self).__name__}@{apcie}/{bus:02x}:{dev:02x}.{fn:1x}",
+        )
         self.busn = bus
         self.devn = dev
         self.fn = fn
@@ -48,7 +55,7 @@ class PCIeDevTracer(Tracer):
         return super()._reloadcls(force)
 
     def r_cfg_BAR(self, val, index):
-        if self.state.bars[index].BASE == 0xfffffff:
+        if self.state.bars[index].BASE == 0xFFFFFFF:
             size = (0x10000000 - val.BASE) << 4
             self.log(f"BAR{index} size = {size:#x}")
             self.state.barsize[index] = size
@@ -57,11 +64,17 @@ class PCIeDevTracer(Tracer):
         self.state.bars[index] = val
         self.update_tracers(val, index)
 
-    def update_tracers(self, val = None, index = None):
+    def update_tracers(self, val=None, index=None):
         self.hv.clear_tracers(self.ident)
         ecam = self.apcie.get_reg(0)[0]
-        self.trace_regmap(ecam + self.ecam_off, 0x1000, self.CFGMAP,
-                          name="cfg", prefix="cfg", mode=TraceMode.WSYNC)
+        self.trace_regmap(
+            ecam + self.ecam_off,
+            0x1000,
+            self.CFGMAP,
+            name="cfg",
+            prefix="cfg",
+            mode=TraceMode.WSYNC,
+        )
         i = 0
         while i < 6:
             idx = i
@@ -80,7 +93,7 @@ class PCIeDevTracer(Tracer):
             else:
                 i += 1
 
-            if addr in (0, 0xfffffff0, 0xffffffff00000000, 0xfffffffffffffff0):
+            if addr in (0, 0xFFFFFFF0, 0xFFFFFFFF00000000, 0xFFFFFFFFFFFFFFF0):
                 continue
 
             size = self.state.barsize[idx]

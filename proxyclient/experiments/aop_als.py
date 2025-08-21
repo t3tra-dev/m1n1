@@ -1,35 +1,42 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 import struct
-from construct import *
 
-from m1n1.setup import *
-from m1n1.hw.dart import DART
+from construct import *
 from m1n1.fw.aop.client import AOPClient
 from m1n1.fw.aop.ipc import *
+from m1n1.hw.dart import DART
+from m1n1.setup import *
 
 # aop nodes have no clocks described in adt for j293. it does it itself
 p.pmgr_adt_clocks_enable("/arm-io/aop")
 p.pmgr_adt_clocks_enable("/arm-io/dart-aop")
 
-dart = DART.from_adt(u, "/arm-io/dart-aop",
-                     iova_range=(u.adt["/arm-io/dart-aop"].vm_base, 0x1000000000))
+dart = DART.from_adt(
+    u, "/arm-io/dart-aop", iova_range=(u.adt["/arm-io/dart-aop"].vm_base, 0x1000000000)
+)
 dart.initialize()
 
 aop = AOPClient(u, "/arm-io/aop", dart)
-aop.update_bootargs({
-    'p0CE': 0x20000,
-    'laCn': 0x0,
-    'tPOA': 0x1,
-    "gila": 0x80,
-})
+aop.update_bootargs(
+    {
+        "p0CE": 0x20000,
+        "laCn": 0x0,
+        "tPOA": 0x1,
+        "gila": 0x80,
+    }
+)
 aop.verbose = 4
 
 p.dapf_init_all()
-aop.asc.OUTBOX_CTRL.val = 0x20001 # (FIFOCNT=0x0, OVERFLOW=0, EMPTY=1, FULL=0, RPTR=0x0, WPTR=0x0, ENABLE=1)
+aop.asc.OUTBOX_CTRL.val = (
+    0x20001  # (FIFOCNT=0x0, OVERFLOW=0, EMPTY=1, FULL=0, RPTR=0x0, WPTR=0x0, ENABLE=1)
+)
 
 aop.start()
 for epno in [0x20, 0x21, 0x22, 0x24, 0x25, 0x26, 0x27, 0x28]:
@@ -38,11 +45,12 @@ aop.work_for(0.3)
 alsep = aop.als
 alsep.VERBOSE = True
 
+
 def start():
-    #ret = alsep.roundtrip(GetProperty(key=AOPPropKey.MANUFACTURER))
-    #print(ret.rets.value.decode("ascii")) # FireFish2
+    # ret = alsep.roundtrip(GetProperty(key=AOPPropKey.MANUFACTURER))
+    # print(ret.rets.value.decode("ascii")) # FireFish2
     ret = alsep.send_notify(GetProperty(key=AOPPropKey.MANUFACTURER))
-    ret = alsep.send_notify(ALSSetPropertyVerbosity(level=0xffffffff)) # retcode: 0
+    ret = alsep.send_notify(ALSSetPropertyVerbosity(level=0xFFFFFFFF))  # retcode: 0
     # [syslog] * [ALSAOPDriver.cpp:267]setProperty Setting log level = -1
 
     dump = """
@@ -68,7 +76,7 @@ def start():
     # [syslog] * [ALSCT720.cpp:690]configureSensor - Configure sensor with gain 8 and integration time 197380
     # [syslog] * [ALSCT720.cpp:708]setSensorEnabled - Enabling the sensor.
 
-    if 0: # test that on/off works
+    if 0:  # test that on/off works
         aop.work_for(0.5)
         ret = alsep.send_notify(ALSSetPropertyInterval(interval=0))
         # [syslog] * [ALSCT720.cpp:598]setProperty: set report interval 0, _wakeHintMode = 0
@@ -77,6 +85,7 @@ def start():
 
     while True:
         aop.work()
+
 
 try:
     start()

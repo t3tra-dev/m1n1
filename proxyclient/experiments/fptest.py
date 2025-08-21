@@ -1,24 +1,28 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 from m1n1.setup import *
+
 from m1n1 import asm
 
 FPCR_FZ = 1 << 24
 
-ACTLR_DEFAULT = 0xc00
+ACTLR_DEFAULT = 0xC00
 ACTLR_AFP = 1 << 5
 
-AFPCR = (3,6,15,2,5)
+AFPCR = (3, 6, 15, 2, 5)
 AFPCR_DAZ = 1 << 0
 AFPCR_FTZ = 1 << 1
 
 code_buffer = p.malloc(0x1000)
 data_buffer = p.malloc(0x1000)
 
-code = asm.ARMAsm("""
+code = asm.ARMAsm(
+    """
     ldr s0, [x0, #0]
     ldr s1, [x0, #4]
     fmul s0, s1, s0
@@ -32,20 +36,23 @@ code = asm.ARMAsm("""
     # to test EL0 access
     # mrs x0, s3_6_c15_c2_5
     ret
-""", code_buffer)
+""",
+    code_buffer,
+)
 
 iface.writemem(code_buffer, code.data)
 p.dc_cvau(code_buffer, code.len)
 p.ic_ivau(code_buffer, code.len)
 
+
 def test_denormals():
 
     data = [
-        0x00400000, # a denormal
-        0x40000000, # 2
+        0x00400000,  # a denormal
+        0x40000000,  # 2
         0,
-        0x00800000, # smallest non-denormal
-        0x3f000000, # 0.5
+        0x00800000,  # smallest non-denormal
+        0x3F000000,  # 0.5
         0,
     ]
 

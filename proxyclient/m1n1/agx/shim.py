@@ -1,25 +1,34 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 
-import errno, ctypes, sys, atexit, os, os.path, mmap
-from construct import *
+import atexit
+import ctypes
+import errno
+import mmap
+import os
+import os.path
+import sys
 
-from m1n1 import malloc
-from m1n1.utils import Register32
+from construct import *
 from m1n1.agx import AGX
 from m1n1.agx.render import *
 from m1n1.agx.uapi import *
 from m1n1.proxyutils import *
 from m1n1.utils import *
+from m1n1.utils import Register32
+
+from m1n1 import malloc
 
 PAGE_SIZE = 32768
 SHIM_MEM_SIZE = 4 * 1024 * 1024 * 1024
+
 
 class IOCTL(Register32):
     NR = 7, 0
     TYPE = 15, 8
     SIZE = 29, 16
     DIR = 31, 30
+
 
 _IOC_NONE = 0
 _IOC_WRITE = 1
@@ -28,36 +37,47 @@ _IOC_READ = 2
 _IO = lambda type, nr: IOCTL(TYPE=type, NR=nr, SIZE=0, DIR=_IOC_NONE)
 _IOR = lambda type, nr, size: IOCTL(TYPE=type, NR=nr, SIZE=size, DIR=_IOC_READ)
 _IOW = lambda type, nr, size: IOCTL(TYPE=type, NR=nr, SIZE=size, DIR=_IOC_WRITE)
-_IOWR = lambda type, nr, size: IOCTL(TYPE=type, NR=nr, SIZE=size, DIR=_IOC_READ|_IOC_WRITE)
+_IOWR = lambda type, nr, size: IOCTL(
+    TYPE=type, NR=nr, SIZE=size, DIR=_IOC_READ | _IOC_WRITE
+)
 
-DRM_IOCTL_BASE = ord('d')
+DRM_IOCTL_BASE = ord("d")
+
 
 def IO(nr):
     def dec(f):
         f._ioctl = _IO(DRM_IOCTL_BASE, nr)
         return f
+
     return dec
+
 
 def IOR(nr, cls):
     def dec(f):
         f._ioctl = _IOR(DRM_IOCTL_BASE, nr, cls.sizeof())
         f._arg_cls = cls
         return f
+
     return dec
+
 
 def IOW(nr, cls):
     def dec(f):
         f._ioctl = _IOW(DRM_IOCTL_BASE, nr, cls.sizeof())
         f._arg_cls = cls
         return f
+
     return dec
+
 
 def IOWR(nr, cls):
     def dec(f):
         f._ioctl = _IOWR(DRM_IOCTL_BASE, nr, cls.sizeof())
         f._arg_cls = cls
         return f
+
     return dec
+
 
 class DRMAsahiShim:
     def __init__(self, memfd):
@@ -79,7 +99,7 @@ class DRMAsahiShim:
         return ctypes.cast(ptr, ctypes.POINTER(ctypes.c_ubyte * size))[0]
 
     def init_agx(self):
-        from m1n1.setup import p, u, iface
+        from m1n1.setup import iface, p, u
 
         p.pmgr_adt_clocks_enable("/arm-io/gfx-asc")
         p.pmgr_adt_clocks_enable("/arm-io/sgx")
@@ -90,11 +110,11 @@ class DRMAsahiShim:
         agx.mon = mon
 
         sgx = agx.sgx_dev
-        #mon.add(sgx.gpu_region_base, sgx.gpu_region_size, "contexts")
-        #mon.add(sgx.gfx_shared_region_base, sgx.gfx_shared_region_size, "gfx-shared")
-        #mon.add(sgx.gfx_handoff_base, sgx.gfx_handoff_size, "gfx-handoff")
+        # mon.add(sgx.gpu_region_base, sgx.gpu_region_size, "contexts")
+        # mon.add(sgx.gfx_shared_region_base, sgx.gfx_shared_region_size, "gfx-shared")
+        # mon.add(sgx.gfx_handoff_base, sgx.gfx_handoff_size, "gfx-handoff")
 
-        #mon.add(agx.initdasgx.gfx_handoff_base, sgx.gfx_handoff_size, "gfx-handoff")
+        # mon.add(agx.initdasgx.gfx_handoff_base, sgx.gfx_handoff_size, "gfx-handoff")
 
         atexit.register(p.reboot)
         agx.start()
@@ -120,8 +140,8 @@ class DRMAsahiShim:
 
         self.log("Pushing objects...")
         for obj in self.bos.values():
-            #if obj._skipped_pushes > 64:# and obj._addr > 0x1200000000 and obj._size > 131072:
-                #continue
+            # if obj._skipped_pushes > 64:# and obj._addr > 0x1200000000 and obj._size > 131072:
+            # continue
             obj.push(True)
         self.log("Push done")
 
@@ -151,14 +171,14 @@ class DRMAsahiShim:
                 obj.val = obj._map
             self.log("Pull done")
 
-        #print("HEAP STATS")
-        #self.ctx.uobj.va.check()
-        #self.ctx.gobj.va.check()
-        #self.ctx.pobj.va.check()
-        #self.agx.kobj.va.check()
-        #self.agx.cmdbuf.va.check()
-        #self.agx.kshared.va.check()
-        #self.agx.kshared2.va.check()
+        # print("HEAP STATS")
+        # self.ctx.uobj.va.check()
+        # self.ctx.gobj.va.check()
+        # self.ctx.pobj.va.check()
+        # self.agx.kobj.va.check()
+        # self.agx.cmdbuf.va.check()
+        # self.agx.kshared.va.check()
+        # self.agx.kshared2.va.check()
 
         self.frame += 1
         return 0
@@ -240,5 +260,6 @@ class DRMAsahiShim:
             print("[Shim] " + s)
         else:
             self.agx.log("[Shim] " + s)
+
 
 Shim = DRMAsahiShim

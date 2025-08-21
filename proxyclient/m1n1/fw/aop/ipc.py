@@ -1,28 +1,31 @@
 from enum import IntEnum
-from construct import *
 from io import BytesIO
 
-from ..afk.epic import *
-from m1n1.utils import FourCC, chexdump
+from construct import *
 from m1n1.constructutils import *
+from m1n1.utils import FourCC, chexdump
+
+from ..afk.epic import *
+
 
 class AOPPropKey(IntEnum):
-    IS_READY     = 0x01
-    MANUFACTURER = 0x0f  # wtf is a firefish2?
-    CHIP_ID      = 0x11
-    PLACEMENT    = 0x1e
-    UNK_21       = 0x21
-    ORIENTATION  = 0x2e
-    LOCATION_ID  = 0x30
-    PRODUCT_ID2  = 0x3f
-    SERIAL_NO    = 0x3e
+    IS_READY = 0x01
+    MANUFACTURER = 0x0F  # wtf is a firefish2?
+    CHIP_ID = 0x11
+    PLACEMENT = 0x1E
+    UNK_21 = 0x21
+    ORIENTATION = 0x2E
+    LOCATION_ID = 0x30
+    PRODUCT_ID2 = 0x3F
+    SERIAL_NO = 0x3E
     CHANNEL_NAME = 0x45
-    VENDOR_ID    = 0x5a
-    PRODUCT_ID   = 0x5b
+    VENDOR_ID = 0x5A
+    PRODUCT_ID = 0x5B
     SERVICE_CONTROLLER = 0x64
     DEVICE_COUNT = 0x65
-    VERSION      = 0x67
-    UNK_DUMP     = 0xd7
+    VERSION = 0x67
+    UNK_DUMP = 0xD7
+
 
 class EPICCall:
     @classmethod
@@ -47,15 +50,21 @@ class EPICCall:
     def dump(self, logger=print):
         args_fmt = [f"{k}={v}" for (k, v) in self.args.items() if k != "_io"]
         rets_fmt = [f"{k}={v}" for (k, v) in self.rets.items() if k != "_io"]
-        logger(f"{type(self).__name__}({', '.join(args_fmt)}) -> ({', '.join(rets_fmt)})")
+        logger(
+            f"{type(self).__name__}({', '.join(args_fmt)}) -> ({', '.join(rets_fmt)})"
+        )
 
     def read_resp(self, f):
         self.rets = self.RETS.parse_stream(f)
 
+
 CALLTYPES = []
+
+
 def reg_calltype(calltype):
     CALLTYPES.append(calltype)
     return calltype
+
 
 @reg_calltype
 class GetHIDDescriptor(EPICCall):
@@ -68,20 +77,23 @@ class GetHIDDescriptor(EPICCall):
         "descriptor" / HexDump(GreedyBytes),
     )
 
+
 @reg_calltype
 class GetProperty(EPICCall):
-    TYPE = 0xa
+    TYPE = 0xA
     ARGS = Struct(
         "blank" / Const(0x0, Int32ul),
         "key" / Enum(Int32ul, AOPPropKey),
     )
     RETS = Struct(
-        #"retcode" / Const(0x0, Int32ul),
-        "value" / GreedyBytes,
+        # "retcode" / Const(0x0, Int32ul),
+        "value"
+        / GreedyBytes,
     )
 
+
 class GetPropertyIsReady(EPICCall):
-    TYPE = 0xa
+    TYPE = 0xA
     ARGS = Struct(
         "blank" / Const(0x0, Int32ul),
         "key" / Const(AOPPropKey.IS_READY, Int32ul),
@@ -91,12 +103,14 @@ class GetPropertyIsReady(EPICCall):
         "state" / FourCC,
     )
 
+
 class ALSPropertyKey(IntEnum):
-    INTERVAL      = 0x00
-    CALIBRATION   = 0x0b
-    MODE          = 0xd7
-    VERBOSITY     = 0xe1
-    UNKE4         = 0xe4
+    INTERVAL = 0x00
+    CALIBRATION = 0x0B
+    MODE = 0xD7
+    VERBOSITY = 0xE1
+    UNKE4 = 0xE4
+
 
 @reg_calltype
 class ALSSetProperty(EPICCall):
@@ -107,6 +121,7 @@ class ALSSetProperty(EPICCall):
     def subclass(cls, cls2):
         cls.SUBCLASSES[int(cls2.SUBTYPE)] = cls2
         return cls2
+
 
 @ALSSetProperty.subclass
 class ALSSetPropertyVerbosity(ALSSetProperty):
@@ -121,6 +136,7 @@ class ALSSetPropertyVerbosity(ALSSetProperty):
         "value" / GreedyBytes,
     )
 
+
 @ALSSetProperty.subclass
 class ALSSetPropertyMode(ALSSetProperty):
     SUBTYPE = ALSPropertyKey.MODE
@@ -134,6 +150,7 @@ class ALSSetPropertyMode(ALSSetProperty):
         "value" / GreedyBytes,
     )
 
+
 @ALSSetProperty.subclass
 class ALSSetPropertyCalibration(ALSSetProperty):
     SUBTYPE = ALSPropertyKey.CALIBRATION
@@ -145,6 +162,7 @@ class ALSSetPropertyCalibration(ALSSetProperty):
     RETS = Struct(
         "retcode" / Const(0xE00002BC, Hex(Int32ul)),
     )
+
 
 @ALSSetProperty.subclass
 class ALSSetPropertyInterval(ALSSetProperty):
@@ -158,6 +176,7 @@ class ALSSetPropertyInterval(ALSSetProperty):
         "retcode" / Const(0x0, Int32ul),
     )
 
+
 @ALSSetProperty.subclass
 class ALSSetPropertyUnkE4(ALSSetProperty):
     SUBTYPE = ALSPropertyKey.UNKE4
@@ -170,8 +189,9 @@ class ALSSetPropertyUnkE4(ALSSetProperty):
         "retcode" / Const(0x0, Int32ul),
     )
 
+
 ALSLuxReport = Struct(
-    "unk0" / Const(0xec, Hex(Int8ul)),
+    "unk0" / Const(0xEC, Hex(Int8ul)),
     "sequence" / Int32ul,
     "timestamp" / Hex(Int64ul),
     "red" / Int32ul,
@@ -179,8 +199,8 @@ ALSLuxReport = Struct(
     "blue" / Int32ul,
     "clear" / Int32ul,
     "lux" / Float32l,
-    "unk_zero" / Int32ul, # 0
-    "status" / Int32ul, # 3
+    "unk_zero" / Int32ul,  # 0
+    "status" / Int32ul,  # 3
     "gain" / Int16ul,
     "unk3" / Int8ul,
     "unk4" / Int8ul,
@@ -188,13 +208,14 @@ ALSLuxReport = Struct(
     "integration_time" / Int32ul,
 )
 
+
 @reg_calltype
 class WrappedCall(EPICCall):
     SUBCLASSES = {}
     TYPE = 0x20
     HDR = Struct(
         "blank" / Const(0x0, Int32ul),
-        "unk1" / Hex(Const(0xffffffff, Int32ul)),
+        "unk1" / Hex(Const(0xFFFFFFFF, Int32ul)),
         "calltype" / Hex(Int32ul),
         "blank2" / ZPadding(16),
         "pad" / Hex(Int32ul),
@@ -224,16 +245,19 @@ class WrappedCall(EPICCall):
     def check_retcode(self):
         if self.rets.retcode:
             self.dump()
-            raise ValueError(f"retcode {self.rets.retcode} in {str(type(self))} (call dumped, see above)")
+            raise ValueError(
+                f"retcode {self.rets.retcode} in {str(type(self))} (call dumped, see above)"
+            )
+
 
 @reg_calltype
 class AudioProbeDevice(EPICCall):
     TYPE = 0x20
-    SUBTYPE = 0xc3_00_00_01
+    SUBTYPE = 0xC3_00_00_01
     ARGS = Struct(
         "pad" / Const(0x0, Int32ul),
-        "unk1" / Hex(Const(0xffffffff, Int32ul)),
-        "subtype" / Hex(Const(0xc3000001, Int32ul)),
+        "unk1" / Hex(Const(0xFFFFFFFF, Int32ul)),
+        "subtype" / Hex(Const(0xC3000001, Int32ul)),
         "pad2" / ZPadding(16),
         "cookie" / Default(Hex(Int32ul), 0),
         "len" / Hex(Const(0x28, Int64ul)),
@@ -250,16 +274,17 @@ class AudioProbeDevice(EPICCall):
         "unk" / Array(51, Default(Hex(Int32ul), 0)),
     )
 
+
 @WrappedCall.reg_subclass
 class AttachDevice(WrappedCall):
-    CALLTYPE = 0xc3_00_00_02
+    CALLTYPE = 0xC3_00_00_02
     ARGS = Struct(
         "blank" / Const(0x0, Int32ul),
-        "unk1" / Hex(Const(0xffffffff, Int32ul)),
-        "calltype" / Hex(Const(0xc3000002, Int32ul)),
+        "unk1" / Hex(Const(0xFFFFFFFF, Int32ul)),
+        "calltype" / Hex(Const(0xC3000002, Int32ul)),
         "blank2" / ZPadding(16),
         "pad" / Padding(4),
-        "len" / Hex(Const(0x2c, Int64ul)),
+        "len" / Hex(Const(0x2C, Int64ul)),
         "devid" / FourCC,
         "pad" / Padding(4),
     )
@@ -268,17 +293,18 @@ class AttachDevice(WrappedCall):
         "unk" / HexDump(GreedyBytes),
     )
 
+
 @reg_calltype
 class AudioAttachDevice(EPICCall):
     TYPE = 0x20
-    SUBTYPE = 0xc3_00_00_02
+    SUBTYPE = 0xC3_00_00_02
     ARGS = Struct(
         "pad" / Const(0x0, Int32ul),
-        "unk1" / Hex(Const(0xffffffff, Int32ul)),
-        "subtype" / Hex(Const(0xc3000002, Int32ul)),
+        "unk1" / Hex(Const(0xFFFFFFFF, Int32ul)),
+        "subtype" / Hex(Const(0xC3000002, Int32ul)),
         "pad2" / ZPadding(16),
         "cookie" / Default(Hex(Int32ul), 0),
-        "len" / Hex(Const(0x2c, Int64ul)),
+        "len" / Hex(Const(0x2C, Int64ul)),
         "devid" / FourCC,
         "dev2" / Default(Hex(Int32ul), 0),
     )
@@ -286,6 +312,7 @@ class AudioAttachDevice(EPICCall):
         "retcode" / Default(Hex(Int32ul), 0),
         "unk" / HexDump(GreedyBytes),
     )
+
 
 PDMConfig = Struct(
     "bytesPerSample" / Int32ul,
@@ -298,7 +325,8 @@ PDMConfig = Struct(
     "channelPhaseSelect" / Int32ul,
     "unk8" / Hex(Int32ul),
     "unk9" / Hex(Int16ul),
-    "ratios" / Struct(
+    "ratios"
+    / Struct(
         "r1" / Int8ul,
         "r2" / Int8ul,
         "r3" / Int8ul,
@@ -306,25 +334,27 @@ PDMConfig = Struct(
     ),
     "filterLengths" / Hex(Int32ul),
     "coeff_bulk" / Int32ul,
-    #"coefficients" / Struct(
+    # "coefficients" / Struct(
     #    "c1" / Int32sl[this._.ratios.r3 * 4 + 4],
     #    "c2" / Int32sl[this._.ratios.r2 * 4 + 4],
     #    "c3" / Int32sl[this._.ratios.r1 * 4 + 4],
-    #),
-    #"junk" / Padding(
+    # ),
+    # "junk" / Padding(
     #    this.coeff_bulk * 4 - 48 \
     #    - (this.ratios.r1 + this.ratios.r2 + this.ratios.r3) * 16
-    #),
-    "coefficients" / Int32sl[
-        (this.ratios.r1 + this.ratios.r2 + this.ratios.r3) * 4 + 12
-    ],
-    "junk" / Padding(
-        lambda this: max(0,
-            this.coeff_bulk * 4 - 48 \
-            - (this.ratios.r1 + this.ratios.r2 + this.ratios.r3) * 16
+    # ),
+    "coefficients"
+    / Int32sl[(this.ratios.r1 + this.ratios.r2 + this.ratios.r3) * 4 + 12],
+    "junk"
+    / Padding(
+        lambda this: max(
+            0,
+            this.coeff_bulk * 4
+            - 48
+            - (this.ratios.r1 + this.ratios.r2 + this.ratios.r3) * 16,
         )
     ),
-    "unk10" / Int32ul, # maybe
+    "unk10" / Int32ul,  # maybe
     "micTurnOnTimeMs" / Int32ul,
     "blank" / ZPadding(16),
     "unk11" / Int32ul,
@@ -334,7 +364,8 @@ PDMConfig = Struct(
 
 DecimatorConfig = Struct(
     "latency" / Int32ul,
-    "ratios" / Struct(
+    "ratios"
+    / Struct(
         "r1" / Int8ul,
         "r2" / Int8ul,
         "r3" / Int8ul,
@@ -342,13 +373,15 @@ DecimatorConfig = Struct(
     ),
     "filterLengths" / Hex(Int32ul),
     "coeff_bulk" / Int32ul,
-    "coefficients" / Int32sl[
-        (this.ratios.r1 + this.ratios.r2 + this.ratios.r3) * 4 + 12
-    ],
-    "junk" / Padding(
-        lambda this: max(0,
-            this.coeff_bulk * 4 - 48 \
-            - (this.ratios.r1 + this.ratios.r2 + this.ratios.r3) * 16
+    "coefficients"
+    / Int32sl[(this.ratios.r1 + this.ratios.r2 + this.ratios.r3) * 4 + 12],
+    "junk"
+    / Padding(
+        lambda this: max(
+            0,
+            this.coeff_bulk * 4
+            - 48
+            - (this.ratios.r1 + this.ratios.r2 + this.ratios.r3) * 16,
         )
     ),
 )
@@ -364,13 +397,13 @@ PowerSetting = Struct(
 )
 
 DEVPROPS = {
-    ('hpai', 202): PowerSetting,
-    ('lpai', 202): PowerSetting,
-    ('hpai', 200): FourCC,
-    ('lpai', 200): FourCC,
-    ('pdm0', 200): PDMConfig,
-    ('pdm0', 210): DecimatorConfig,
-    ('lpai', 301): Struct(
+    ("hpai", 202): PowerSetting,
+    ("lpai", 202): PowerSetting,
+    ("hpai", 200): FourCC,
+    ("lpai", 200): FourCC,
+    ("pdm0", 200): PDMConfig,
+    ("pdm0", 210): DecimatorConfig,
+    ("lpai", 301): Struct(
         "unk1" / Int32ul,
         "unk2" / Int32ul,
         "unk3" / Int32ul,
@@ -378,16 +411,18 @@ DEVPROPS = {
     ),
 }
 
+
 class AudioPropertyKey(IntEnum):
-    STATE   = 200   # 0xc8
-    POWER   = 202   # 0xca
-    MAIN    = 203   # 0xcb
-    FORMAT  = 302   # 0x12e
+    STATE = 200  # 0xc8
+    POWER = 202  # 0xca
+    MAIN = 203  # 0xcb
+    FORMAT = 302  # 0x12e
+
 
 @reg_calltype
 class AudioProperty(EPICCall):
     TYPE = 0x20
-    SUBTYPE = 0xc3000004
+    SUBTYPE = 0xC3000004
     SUBCLASSES = {}
 
     @classmethod
@@ -395,13 +430,14 @@ class AudioProperty(EPICCall):
         cls.SUBCLASSES[int(cls2.SUBTYPE)] = cls2
         return cls2
 
+
 @AudioProperty.subclass
 class AudioPropertyState(AudioProperty):
     SUBSUBTYPE = AudioPropertyKey.STATE
     ARGS = Struct(
         "pad" / Const(0x0, Int32ul),
-        "unk1" / Hex(Const(0xffffffff, Int32ul)),
-        "calltype" / Hex(Const(0xc3000004, Int32ul)),
+        "unk1" / Hex(Const(0xFFFFFFFF, Int32ul)),
+        "calltype" / Hex(Const(0xC3000004, Int32ul)),
         "blank2" / ZPadding(16),
         "cookie" / Default(Hex(Int32ul), 0),
         "len" / Hex(Const(0x30, Int64ul)),
@@ -415,13 +451,14 @@ class AudioPropertyState(AudioProperty):
         "state" / FourCC,
     )
 
+
 @AudioProperty.subclass
 class AudioPropertyFormat(AudioProperty):
     SUBSUBTYPE = AudioPropertyKey.FORMAT
     ARGS = Struct(
         "pad" / Const(0x0, Int32ul),
-        "unk1" / Hex(Const(0xffffffff, Int32ul)),
-        "calltype" / Hex(Const(0xc3000004, Int32ul)),
+        "unk1" / Hex(Const(0xFFFFFFFF, Int32ul)),
+        "calltype" / Hex(Const(0xC3000004, Int32ul)),
         "blank2" / ZPadding(16),
         "cookie" / Default(Hex(Int32ul), 0),
         "len" / Hex(Const(0x30, Int64ul)),
@@ -431,12 +468,13 @@ class AudioPropertyFormat(AudioProperty):
     )
     RETS = Struct(
         "retcode" / Const(0x0, Int32ul),
-        "format" / Int32ul, # 16 == float32?
+        "format" / Int32ul,  # 16 == float32?
         "fourcc" / FourCC,  # PCML
-        "sample_rate" / Int32ul, # 16000
-        "channels" / Int32ul, # 3
-        "bytes_per_sample" / Int32ul, # 2
+        "sample_rate" / Int32ul,  # 16000
+        "channels" / Int32ul,  # 3
+        "bytes_per_sample" / Int32ul,  # 2
     )
+
 
 AudioPowerSetting = Struct(
     "devid" / FourCC,
@@ -448,19 +486,20 @@ AudioPowerSetting = Struct(
     "blank2" / ZPadding(20),
 )
 
+
 @AudioProperty.subclass
 class AudioPropertyPower(AudioProperty):
     SUBSUBTYPE = AudioPropertyKey.POWER
     ARGS = Struct(
         "pad" / Const(0x0, Int32ul),
-        "unk1" / Hex(Const(0xffffffff, Int32ul)),
-        "calltype" / Hex(Const(0xc3000005, Int32ul)),
+        "unk1" / Hex(Const(0xFFFFFFFF, Int32ul)),
+        "calltype" / Hex(Const(0xC3000005, Int32ul)),
         "blank2" / ZPadding(16),
         "cookie" / Default(Hex(Int32ul), 0),
-        "len" / Hex(Const(0x30 + 0x30, Int64ul)), # len(this.data) + 0x30
+        "len" / Hex(Const(0x30 + 0x30, Int64ul)),  # len(this.data) + 0x30
         "devid" / FourCC,
         "modifier" / Const(AudioPropertyKey.POWER, Int32ul),
-        "len2" / Hex(Const(0x30, Int32ul)), # len(this.data)
+        "len2" / Hex(Const(0x30, Int32ul)),  # len(this.data)
         "data" / AudioPowerSetting,
     )
     RETS = Struct(
@@ -468,13 +507,14 @@ class AudioPropertyPower(AudioProperty):
         "value" / HexDump(GreedyBytes),
     )
 
+
 @WrappedCall.reg_subclass
 class GetDeviceProp(WrappedCall):
-    CALLTYPE = 0xc3_00_00_04
+    CALLTYPE = 0xC3_00_00_04
     ARGS = Struct(
         "blank" / Const(0x0, Int32ul),
-        "unk1" / Hex(Const(0xffffffff, Int32ul)),
-        "calltype" / Hex(Const(0xc3000004, Int32ul)),
+        "unk1" / Hex(Const(0xFFFFFFFF, Int32ul)),
+        "calltype" / Hex(Const(0xC3000004, Int32ul)),
         "blank2" / ZPadding(16),
         "pad" / Padding(4),
         "len" / Hex(Const(0x30, Int64ul)),
@@ -485,32 +525,37 @@ class GetDeviceProp(WrappedCall):
     RETS = Struct(
         "retcode" / Default(Hex(Int32ul), 0),
         "len" / Optional(Int32ul),
-        "data" / Switch(lambda s: (s._params.devid, s._params.modifier),
+        "data"
+        / Switch(
+            lambda s: (s._params.devid, s._params.modifier),
             DEVPROPS,
-        default=HexDump(GreedyBytes))
+            default=HexDump(GreedyBytes),
+        ),
     )
 
     def read_resp(self, f):
-        self.rets = self.RETS.parse_stream(f,
-            devid=self.args.devid, modifier=self.args.modifier
+        self.rets = self.RETS.parse_stream(
+            f, devid=self.args.devid, modifier=self.args.modifier
         )
+
 
 @WrappedCall.reg_subclass
 class SetDeviceProp(WrappedCall):
-    CALLTYPE = 0xc3_00_00_05
+    CALLTYPE = 0xC3_00_00_05
     ARGS = Struct(
         "blank" / Const(0x0, Int32ul),
-        "unk1" / Hex(Const(0xffffffff, Int32ul)),
-        "calltype" / Hex(Const(0xc3000005, Int32ul)),
+        "unk1" / Hex(Const(0xFFFFFFFF, Int32ul)),
+        "calltype" / Hex(Const(0xC3000005, Int32ul)),
         "blank2" / ZPadding(16),
         "pad" / Padding(4),
-        "len" / Hex(Int64ul), # len(this.data) + 0x30
+        "len" / Hex(Int64ul),  # len(this.data) + 0x30
         "devid" / FourCC,
         "modifier" / Int32ul,
-        "len2" / Hex(Int32ul), # len(this.data)
-        "data" / Switch(lambda s: (s.devid, s.modifier),
-            DEVPROPS,
-        default=HexDump(GreedyBytes))
+        "len2" / Hex(Int32ul),  # len(this.data)
+        "data"
+        / Switch(
+            lambda s: (s.devid, s.modifier), DEVPROPS, default=HexDump(GreedyBytes)
+        ),
     )
     RETS = Struct(
         "retcode" / Default(Hex(Int32ul), 0),
@@ -519,10 +564,11 @@ class SetDeviceProp(WrappedCall):
 
     def _args_fixup(self):
         data_len = len(self.ARGS.build(Container(len=0, len2=0, **self.args))) - 52
-        if 'len' not in self.args:
+        if "len" not in self.args:
             self.args.len = data_len + 0x30
-        if 'len2' not in self.args:
+        if "len2" not in self.args:
             self.args.len2 = data_len
+
 
 @reg_calltype
 class IndirectCall(EPICCall):

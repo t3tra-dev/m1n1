@@ -1,13 +1,16 @@
 # SPDX-License-Identifier: MIT
-import os, struct, sys, time
+import os
+import struct
+import sys
+import time
 
 from .hv import HV
+from .hw.pmu import PMU
 from .proxy import *
 from .proxyutils import *
 from .sysreg import *
 from .tgtypes import *
 from .utils import *
-from .hw.pmu import PMU
 
 # Create serial connection
 iface = UartInterface()

@@ -1,24 +1,40 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
-import argparse, pathlib, time
+import argparse
+import pathlib
+import time
 
-parser = argparse.ArgumentParser(description='Mach-O loader for m1n1')
-parser.add_argument('-q', '--quiet', action="store_true", help="Disable framebuffer")
-parser.add_argument('-n', '--no-sepfw', action="store_true", help="Do not preserve SEPFW")
-parser.add_argument('-c', '--call', action="store_true", help="Use call mode")
-parser.add_argument('-r', '--raw', action="store_true", help="Image is raw")
-parser.add_argument('-E', '--entry-point', action="store", type=int, help="Entry point for the raw image", default=0x800)
-parser.add_argument('-x', '--xnu', action="store_true", help="Set up for chainloading XNU")
-parser.add_argument('payload', type=pathlib.Path)
-parser.add_argument('boot_args', default=[], nargs="*")
+parser = argparse.ArgumentParser(description="Mach-O loader for m1n1")
+parser.add_argument("-q", "--quiet", action="store_true", help="Disable framebuffer")
+parser.add_argument(
+    "-n", "--no-sepfw", action="store_true", help="Do not preserve SEPFW"
+)
+parser.add_argument("-c", "--call", action="store_true", help="Use call mode")
+parser.add_argument("-r", "--raw", action="store_true", help="Image is raw")
+parser.add_argument(
+    "-E",
+    "--entry-point",
+    action="store",
+    type=int,
+    help="Entry point for the raw image",
+    default=0x800,
+)
+parser.add_argument(
+    "-x", "--xnu", action="store_true", help="Set up for chainloading XNU"
+)
+parser.add_argument("payload", type=pathlib.Path)
+parser.add_argument("boot_args", default=[], nargs="*")
 args = parser.parse_args()
 
+from m1n1.macho import MachO
 from m1n1.setup import *
 from m1n1.tgtypes import BootArgs_r1, BootArgs_r2, BootArgs_r3
-from m1n1.macho import MachO
+
 from m1n1 import asm
 
 new_base = u.base
@@ -70,9 +86,13 @@ if not args.no_sepfw:
     u.adt["chosen"]["memory-map"].BootArgs = (new_base + bootargs_off, bootargs_size)
     if hasattr(u.adt["chosen"]["memory-map"], "preoslog"):
         p.memcpy8(image_addr + preoslog_off, preoslog_start, preoslog_size)
-        u.adt["chosen"]["memory-map"].preoslog = (new_base + preoslog_off, preoslog_size)
+        u.adt["chosen"]["memory-map"].preoslog = (
+            new_base + preoslog_off,
+            preoslog_size,
+        )
 
 if args.xnu:
+
     def remove_oslog(node):
         names = node.segment_names.split(";")
         try:
@@ -80,9 +100,11 @@ if args.xnu:
         except ValueError:
             return
         print(f"Removing __OS_LOG from {node.name}")
-        names = names[:idx] + names[idx + 1:]
+        names = names[:idx] + names[idx + 1 :]
         node.segment_names = ";".join(names)
-        node.segment_ranges = node.segment_ranges[:idx * 32] + node.segment_ranges[32 + idx * 32: ]
+        node.segment_ranges = (
+            node.segment_ranges[: idx * 32] + node.segment_ranges[32 + idx * 32 :]
+        )
 
     for node in u.adt["/arm-io"]:
         if hasattr(node, "segment_names"):
@@ -94,7 +116,7 @@ if args.xnu:
 
 print("Setting secondary CPU RVBARs...")
 
-rvbar = entry & ~0xfff
+rvbar = entry & ~0xFFF
 for cpu in u.adt["cpus"]:
     if cpu.state == "running":
         continue
@@ -120,7 +142,7 @@ if len(args.boot_args) > 0:
 
 if args.xnu:
     # Fix virt_base, since we often install m1n1 with it set to 0 which xnu does not like
-    tba.virt_base = 0xfffffe0010000000 + (tba.phys_base & (32 * 1024 * 1024 - 1))
+    tba.virt_base = 0xFFFFFE0010000000 + (tba.phys_base & (32 * 1024 * 1024 - 1))
     tba.devtree = u.ba.devtree - u.ba.virt_base + tba.virt_base
 
 if tba.revision <= 1:
@@ -132,7 +154,8 @@ elif tba.revision == 3:
 
 print(f"Copying stub...")
 
-stub = asm.ARMAsm(f"""
+stub = asm.ARMAsm(
+    f"""
 1:
         ldp x4, x5, [x1], #16
         stp x4, x5, [x2]
@@ -144,7 +167,9 @@ stub = asm.ARMAsm(f"""
 
         ldr x1, ={entry}
         br x1
-""", image_addr + image_size)
+""",
+    image_addr + image_size,
+)
 
 iface.writemem(stub.addr, stub.data)
 p.dc_cvau(stub.addr, stub.len)
@@ -163,7 +188,14 @@ if args.call:
     except ProxyCommandError:
         pass
     print(f"Jumping to stub at 0x{stub.addr:x}")
-    p.call(stub.addr, new_base + bootargs_off, image_addr, new_base, image_size, reboot=True)
+    p.call(
+        stub.addr,
+        new_base + bootargs_off,
+        image_addr,
+        new_base,
+        image_size,
+        reboot=True,
+    )
 else:
     print(f"Reloading into stub at 0x{stub.addr:x}")
     p.reload(stub.addr, new_base + bootargs_off, image_addr, new_base, image_size)

@@ -5,6 +5,7 @@ from ..utils import *
 
 __all__ = []
 
+
 class RegCacheAlwaysCached(Reloadable):
     def __init__(self, parent):
         self.parent = parent
@@ -14,6 +15,7 @@ class RegCacheAlwaysCached(Reloadable):
 
     def write(self, addr, data, width):
         raise Exception("Trying to write a register to the cache")
+
 
 class RegCache(Reloadable):
     def __init__(self, hv):
@@ -47,8 +49,10 @@ class RegCache(Reloadable):
         else:
             raise Exception("Cannot write register in asynchronous context")
 
+
 class TracerState:
     pass
+
 
 class Tracer(Reloadable):
     DEFAULT_MODE = TraceMode.ASYNC
@@ -67,7 +71,7 @@ class Tracer(Reloadable):
             self.state.__dict__.update(cache.get("state", {}))
         hv.tracer_caches[self.ident] = {
             "regcache": self._cache.cache,
-            "state": self.state.__dict__
+            "state": self.state.__dict__,
         }
 
     def init_state(self):
@@ -118,13 +122,27 @@ class Tracer(Reloadable):
     def trace(self, start, size, mode, read=True, write=True, **kwargs):
         zone = irange(start, size)
         if mode == TraceMode.HOOK:
-            self.hv.add_tracer(zone, self.ident, mode, self.hook_r if read else None,
-                               self.hook_w if write else None, **kwargs)
+            self.hv.add_tracer(
+                zone,
+                self.ident,
+                mode,
+                self.hook_r if read else None,
+                self.hook_w if write else None,
+                **kwargs,
+            )
         else:
-            self.hv.add_tracer(zone, self.ident, mode, self.evt_rw if read else None,
-                               self.evt_rw if write else None, **kwargs)
+            self.hv.add_tracer(
+                zone,
+                self.ident,
+                mode,
+                self.evt_rw if read else None,
+                self.evt_rw if write else None,
+                **kwargs,
+            )
 
-    def trace_regmap(self, start, size, cls, mode=None, name=None, prefix=None, regmap_offset=0):
+    def trace_regmap(
+        self, start, size, cls, mode=None, name=None, prefix=None, regmap_offset=0
+    ):
         if mode is None:
             mode = self.DEFAULT_MODE
         if name is None:
@@ -150,6 +168,7 @@ class Tracer(Reloadable):
     def log(self, msg, show_cpu=True):
         self.hv.log(f"[{self.ident}] {msg}", show_cpu=show_cpu)
 
+
 class PrintTracer(Tracer):
     def __init__(self, hv, device_addr_tbl):
         super().__init__(hv)
@@ -163,8 +182,10 @@ class PrintTracer(Tracer):
             start = zone2.start
         t = "W" if evt.flags.WRITE else "R"
         m = "+" if evt.flags.MULTI else " "
-        logline = (f"[cpu{evt.flags.CPU}] [0x{evt.pc:016x}] MMIO: {t}.{1<<evt.flags.WIDTH:<2}{m} " +
-                   f"0x{evt.addr:x} ({name}, offset {evt.addr - start:#04x}) = 0x{evt.data:x}")
+        logline = (
+            f"[cpu{evt.flags.CPU}] [0x{evt.pc:016x}] MMIO: {t}.{1<<evt.flags.WIDTH:<2}{m} "
+            + f"0x{evt.addr:x} ({name}, offset {evt.addr - start:#04x}) = 0x{evt.data:x}"
+        )
         print(logline)
         if self.log_file:
             self.log_file.write(f"# {logline}\n")
@@ -174,6 +195,7 @@ class PrintTracer(Tracer):
             else:
                 stmt = f"p.read{width}({start:#x} + {evt.addr - start:#x})\n"
             self.log_file.write(stmt)
+
 
 class ADTDevTracer(Tracer):
     REGMAPS = []
@@ -214,7 +236,18 @@ class ADTDevTracer(Tracer):
                 prefix = self.PREFIXES[i]
 
             start, size = self.dev.get_reg(i)
-            self.trace_regmap(start, size, regmap, name=name, prefix=prefix, regmap_offset=regmap_offset)
+            self.trace_regmap(
+                start,
+                size,
+                regmap,
+                name=name,
+                prefix=prefix,
+                regmap_offset=regmap_offset,
+            )
 
-__all__.extend(k for k, v in globals().items()
-               if (callable(v) or isinstance(v, type)) and v.__module__.startswith(__name__))
+
+__all__.extend(
+    k
+    for k, v in globals().items()
+    if (callable(v) or isinstance(v, type)) and v.__module__.startswith(__name__)
+)

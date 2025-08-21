@@ -6,12 +6,14 @@ from .proxyutils import GuardedHeap
 
 __all__ = ["dynamic_regs", "impdef_regs", "static_regs", "find_regs"]
 
+
 def _all():
     for op1 in range(1 << 3):
         for CRn in (0b1011, 0b1111):
             for CRm in range(1 << 4):
                 for op2 in range(1 << 3):
                     yield 3, op1, CRn, CRm, op2
+
 
 dynamic_regs = [
     sysreg.ACNTVCT_EL0,
@@ -20,6 +22,7 @@ dynamic_regs = [
 
 impdef_regs = list(_all())
 static_regs = [i for i in _all() if i not in dynamic_regs]
+
 
 def find_regs(u, regs=None, block=1024, call=None, values=True):
     if regs is None:
@@ -33,17 +36,19 @@ def find_regs(u, regs=None, block=1024, call=None, values=True):
     with GuardedHeap(u.heap) as heap:
         data_buffer = heap.malloc(data_len)
 
-        template = asm.ARMAsm("""
+        template = asm.ARMAsm(
+            """
             mov x2, x0
             mrs x2, s3_0_c0_c0_0
             str x2, [x1], #8
-        """, 0x1000)
+        """,
+            0x1000,
+        )
 
         mov, mrs, st = struct.unpack("3I", template.data)
 
-
-        BAD = 0xacce5515abad1dea
-        OOPS = 0xdeadc0dedeadc0de
+        BAD = 0xACCE5515ABAD1DEA
+        OOPS = 0xDEADC0DEDEADC0DE
 
         iregs = iter(regs)
 
@@ -55,7 +60,9 @@ def find_regs(u, regs=None, block=1024, call=None, values=True):
                 bregs.append(enc)
                 assert op0 == 3
 
-                insns.extend((mov, mrs | (op1 << 16) | (CRn << 12) | (CRm << 8) | (op2 << 5), st))
+                insns.extend(
+                    (mov, mrs | (op1 << 16) | (CRn << 12) | (CRm << 8) | (op2 << 5), st)
+                )
 
                 if len(bregs) >= block:
                     break
@@ -64,7 +71,9 @@ def find_regs(u, regs=None, block=1024, call=None, values=True):
                 break
 
             p.memset64(data_buffer, OOPS, data_len)
-            u.exec(insns, BAD, data_buffer, call=call, silent=True, ignore_exceptions=True)
+            u.exec(
+                insns, BAD, data_buffer, call=call, silent=True, ignore_exceptions=True
+            )
             data = iface.readmem(data_buffer, 8 * len(bregs))
             for reg, val in zip(bregs, struct.unpack(f"<{len(bregs)}Q", data)):
                 if val == OOPS:
@@ -74,6 +83,7 @@ def find_regs(u, regs=None, block=1024, call=None, values=True):
                         yield reg, val
                     else:
                         yield reg
+
 
 if __name__ == "__main__":
     from m1n1.setup import *

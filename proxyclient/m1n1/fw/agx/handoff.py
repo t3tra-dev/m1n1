@@ -1,25 +1,28 @@
 # SPDX-License-Identifier: MIT
-from ...utils import *
 from contextlib import contextmanager
 
-PPL_MAGIC = 0x4b1d000000000002
+from ...utils import *
+
+PPL_MAGIC = 0x4B1D000000000002
+
 
 class GFXHandoffStruct(RegMap):
-    MAGIC_AP    = 0x0, Register64
-    MAGIC_FW    = 0x8, Register64
+    MAGIC_AP = 0x0, Register64
+    MAGIC_FW = 0x8, Register64
 
-    LOCK_AP     = 0x10, Register8
-    LOCK_FW     = 0x11, Register8
-    TURN        = 0x14, Register32
+    LOCK_AP = 0x10, Register8
+    LOCK_FW = 0x11, Register8
+    TURN = 0x14, Register32
 
-    CUR_CTX     = 0x18, Register32
+    CUR_CTX = 0x18, Register32
 
     FLUSH_STATE = irange(0x20, 0x41, 0x18), Register64
-    FLUSH_ADDR  = irange(0x28, 0x41, 0x18), Register64
-    FLUSH_SIZE  = irange(0x30, 0x41, 0x18), Register64
+    FLUSH_ADDR = irange(0x28, 0x41, 0x18), Register64
+    FLUSH_SIZE = irange(0x30, 0x41, 0x18), Register64
 
-    UNK2        = 0x638, Register8
-    UNK3        = 0x640, Register64
+    UNK2 = 0x638, Register8
+    UNK3 = 0x640, Register64
+
 
 class GFXHandoff:
     def __init__(self, u):
@@ -61,7 +64,7 @@ class GFXHandoff:
         print("[Handoff] Initializing...")
 
         self.reg.MAGIC_AP.val = PPL_MAGIC
-        self.reg.UNK = 0xffffffff
+        self.reg.UNK = 0xFFFFFFFF
         self.reg.UNK3 = 0
 
         with self.lock():
@@ -111,7 +114,7 @@ class GFXHandoff:
     # - complete_unmap()
     def prepare_unmap(self, base, size, context):
         assert self.reg.FLUSH_STATE[context].val == 0
-        self.reg.FLUSH_ADDR[context].val = 0xdead000000000000 | (base & 0xffffffffffff)
+        self.reg.FLUSH_ADDR[context].val = 0xDEAD000000000000 | (base & 0xFFFFFFFFFFFF)
         self.reg.FLUSH_SIZE[context].val = size
         self.reg.FLUSH_STATE[context].val = 2
 

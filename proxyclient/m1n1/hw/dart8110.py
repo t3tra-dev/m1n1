@@ -1,18 +1,20 @@
 # SPDX-License-Identifier: MIT
 
 import struct
-
 from enum import IntEnum
-from ..utils import *
+
 from ..malloc import Heap
+from ..utils import *
 
 __all__ = ["DART8110Regs", "DART8110"]
+
 
 class R_PARAMS_0(Register32):
     CLIENT_PARTITIONS_SUPPORTED = 29
     LOG2_PGSZ = 27, 24
     LOG2_TE_COUNT = 22, 20
     TLB_SET_COUNT = 11, 0
+
 
 class R_PARAMS_4(Register32):
     LOG2_NUM_WAYS = 30, 28
@@ -28,15 +30,18 @@ class R_PARAMS_4(Register32):
     SUPPORT_REG_LOCK = 1
     SUPPORT_FULL_BYPASS = 0
 
+
 class R_PARAMS_8(Register32):
     PA_WIDTH = 29, 24
     VA_WIDTH = 21, 16
     VERS_MAJ = 15, 8
     VERS_MIN = 7, 0
 
+
 class R_PARAMS_C(Register32):
     NUM_CLIENTS = 24, 16
     NUM_SIDS = 8, 0
+
 
 class R_ERROR(Register32):
     FLAG = 31
@@ -62,6 +67,7 @@ class R_ERROR(Register32):
     NO_PGD = 1  # "CTE"
     NO_TTBR = 0
 
+
 class R_TLB_OP(Register32):
     BUSY = 31
 
@@ -79,10 +85,12 @@ class R_TLB_OP(Register32):
     OP = 10, 8
     STREAM = 7, 0
 
+
 class R_TLB_OP_IDX(Register32):
     SET = 13, 8
     WAY = 6, 4
     TE = 2, 0
+
 
 class R_PROTECT(Register32):
     LOCK_TZ_SELECT = 4
@@ -92,22 +100,26 @@ class R_PROTECT(Register32):
     LOCK_REG_4xx = 1
     LOCK_TCR_TTBR = 0
 
+
 class R_DIAG_LOCK(Register32):
     # FIXME: how does this work exactly?
     LOCK_ON_ERR = 1
     LOCK = 0
 
+
 class R_TCR(Register32):
     REMAP = 11, 8
     REMAP_EN = 7
-    FOUR_LEVELS = 3     # not supported on hwrev 1
+    FOUR_LEVELS = 3  # not supported on hwrev 1
     BYPASS_DAPF = 2
     BYPASS_DART = 1
     TRANSLATE_ENABLE = 0
 
+
 class R_TTBR(Register32):
     ADDR = 29, 2
     VALID = 0
+
 
 class PTE(Register64):
     SP_START = 63, 52
@@ -118,6 +130,7 @@ class PTE(Register64):
     UNCACHABLE = 1
     VALID = 0
 
+
 class DART8110Regs(RegMap):
     PARAMS_0 = 0x000, R_PARAMS_0
     PARAMS_4 = 0x004, R_PARAMS_4
@@ -125,119 +138,119 @@ class DART8110Regs(RegMap):
     PARAMS_C = 0x00C, R_PARAMS_C
     # Unknown RO
     REG_0x10 = 0x010, Register32
-    REG_0x14 = 0x014, Register32    # hwrev 2 only
+    REG_0x14 = 0x014, Register32  # hwrev 2 only
 
-    TLB_OP      = 0x080, R_TLB_OP
-    TLP_OP_IDX  = 0x084, R_TLB_OP_IDX
-    TLB_TAG_LO  = 0x088, Register32
-    TLB_TAG_HI  = 0x08c, Register32    # hwrev 2 only
-    TLB_PA_LO   = 0x090, Register32
-    TLB_PA_HI   = 0x094, Register32
-    TLB_START_DVA_PAGE  = 0x098, Register32    # hwrev 2 only
-    TLB_END_DVA_PAGE    = 0x0a0, Register32    # hwrev 2 only
+    TLB_OP = 0x080, R_TLB_OP
+    TLP_OP_IDX = 0x084, R_TLB_OP_IDX
+    TLB_TAG_LO = 0x088, Register32
+    TLB_TAG_HI = 0x08C, Register32  # hwrev 2 only
+    TLB_PA_LO = 0x090, Register32
+    TLB_PA_HI = 0x094, Register32
+    TLB_START_DVA_PAGE = 0x098, Register32  # hwrev 2 only
+    TLB_END_DVA_PAGE = 0x0A0, Register32  # hwrev 2 only
 
-    ERROR           = 0x100, R_ERROR
-    ERROR_DISABLE   = 0x104, R_ERROR
+    ERROR = 0x100, R_ERROR
+    ERROR_DISABLE = 0x104, R_ERROR
 
     # Found via register bruteforcing
-    STREAM_UNK_SET  = irange(0x120, 8, 4), Register32
-    STREAM_UNK_CLR  = irange(0x140, 8, 4), Register32
+    STREAM_UNK_SET = irange(0x120, 8, 4), Register32
+    STREAM_UNK_CLR = irange(0x140, 8, 4), Register32
 
     # these are all accessed by error interrupt handler
-    REG_0x160   = 0x160, Register32
-    REG_0x164   = 0x164, Register32
-    ERROR_ADDR_LO   = 0x170, Register32
-    ERROR_ADDR_HI   = 0x174, Register32
-    REG_0x178   = 0x178, Register32     # hwrev 2 only
-    REG_0x180   = irange(0x180, 4, 4), Register32
-    REG_0x1a0   = irange(0x1a0, 8, 4), Register32
-    ERR_SECONDARY   = irange(0x1c0, 8, 4), Register32
+    REG_0x160 = 0x160, Register32
+    REG_0x164 = 0x164, Register32
+    ERROR_ADDR_LO = 0x170, Register32
+    ERROR_ADDR_HI = 0x174, Register32
+    REG_0x178 = 0x178, Register32  # hwrev 2 only
+    REG_0x180 = irange(0x180, 4, 4), Register32
+    REG_0x1a0 = irange(0x1A0, 8, 4), Register32
+    ERR_SECONDARY = irange(0x1C0, 8, 4), Register32
 
     # Write bits to _PROTECT to protect them.
     # They can be unprotected by writing to _UNPROTECT unless _LOCK is written.
     # If _LOCK is written, protection can be enabled but not disabled.
-    REG_PROTECT         = 0x200, R_PROTECT
-    REG_UNPROTECT       = 0x204, R_PROTECT
-    REG_PROTECT_LOCK    = 0x208, R_PROTECT
+    REG_PROTECT = 0x200, R_PROTECT
+    REG_UNPROTECT = 0x204, R_PROTECT
+    REG_PROTECT_LOCK = 0x208, R_PROTECT
 
     # Tunables touch this, can set bits FF00001F, RW
-    REG_0x20c       = 0x20c, Register32
+    REG_0x20c = 0x20C, Register32
 
-    DIAG_LOCK   = 0x210, R_DIAG_LOCK
+    DIAG_LOCK = 0x210, R_DIAG_LOCK
 
     # All unknown, related to transaction queueing???
 
     # can set bits 3FFFFFFC, RW
-    REG_0x218   = 0x218, Register32
+    REG_0x218 = 0x218, Register32
     # Tunables touch this, can set bits 000F0F0F, RW
-    REG_0x220   = 0x220, Register32
+    REG_0x220 = 0x220, Register32
     # Tunables touch this, can set bits 00FFFFFF, RW
-    REG_0x224   = 0x224, Register32
+    REG_0x224 = 0x224, Register32
     # can set bits 3F3F3F3F
-    TLIMIT      = 0x228, Register32
+    TLIMIT = 0x228, Register32
     # can set bits 07070707
-    TEQRESERVE  = 0x22c, Register32
+    TEQRESERVE = 0x22C, Register32
     # RO, outstanding transaction count???
-    TRANS       = irange(0x230, 4, 4), Register32
+    TRANS = irange(0x230, 4, 4), Register32
 
     # hwrev 2 only for all of these
-    REG_0x300   = 0x300, Register32
-    REG_0x308   = 0x308, Register32
-    REG_0x310   = 0x310, Register32
-    REG_0x318   = 0x318, Register32
-    REG_0x320   = 0x320, Register32
-    REG_0x328   = 0x328, Register32
-    REG_0x330   = 0x330, Register32
-    REG_0x338   = 0x338, Register32
-    REG_0x340   = 0x340, Register32
-    REG_0x348   = 0x348, Register32
-    REG_0x350   = 0x350, Register32
-    REG_0x358   = 0x358, Register32
+    REG_0x300 = 0x300, Register32
+    REG_0x308 = 0x308, Register32
+    REG_0x310 = 0x310, Register32
+    REG_0x318 = 0x318, Register32
+    REG_0x320 = 0x320, Register32
+    REG_0x328 = 0x328, Register32
+    REG_0x330 = 0x330, Register32
+    REG_0x338 = 0x338, Register32
+    REG_0x340 = 0x340, Register32
+    REG_0x348 = 0x348, Register32
+    REG_0x350 = 0x350, Register32
+    REG_0x358 = 0x358, Register32
 
     # Unknown
-    REG_0x400   = 0x400, Register32     # can set 00000003
-    REG_0x404   = 0x404, Register32     # can set 001FFFFF
-    REG_0x408   = 0x408, Register32     # can set 00FFFFFC
-    REG_0x410   = 0x410, Register32     # can set 3FFFFFFC
+    REG_0x400 = 0x400, Register32  # can set 00000003
+    REG_0x404 = 0x404, Register32  # can set 001FFFFF
+    REG_0x408 = 0x408, Register32  # can set 00FFFFFC
+    REG_0x410 = 0x410, Register32  # can set 3FFFFFFC
 
     # These registers exist even though it's "not supported"
-    TZ_CONFIG           = 0x500, Register32     # 3 bits
-    TZ_SELECT           = 0x504, Register32     # 1 bit
-    TZ_REGION0_START    = 0x508, Register32
-    TZ_REGION0_END      = 0x510, Register32
-    TZ_REGION0_OFFSET   = 0x518, Register32
-    TZ_REGION1_START    = 0x520, Register32
-    TZ_REGION1_END      = 0x528, Register32
-    TZ_REGION1_OFFSET   = 0x530, Register32
-    TZ_REGION2_START    = 0x538, Register32
-    TZ_REGION2_END      = 0x540, Register32
-    TZ_REGION2_OFFSET   = 0x548, Register32
+    TZ_CONFIG = 0x500, Register32  # 3 bits
+    TZ_SELECT = 0x504, Register32  # 1 bit
+    TZ_REGION0_START = 0x508, Register32
+    TZ_REGION0_END = 0x510, Register32
+    TZ_REGION0_OFFSET = 0x518, Register32
+    TZ_REGION1_START = 0x520, Register32
+    TZ_REGION1_END = 0x528, Register32
+    TZ_REGION1_OFFSET = 0x530, Register32
+    TZ_REGION2_START = 0x538, Register32
+    TZ_REGION2_END = 0x540, Register32
+    TZ_REGION2_OFFSET = 0x548, Register32
 
     # completely guessed, unverified, can set bits 0F077077
-    PERF_INTR_ENABLE    = 0x700, Register32
-    PERF_INTR_STATUS    = 0x704, Register32
+    PERF_INTR_ENABLE = 0x700, Register32
+    PERF_INTR_STATUS = 0x704, Register32
 
-    PERF_UNK1   = irange(0x720, 8, 4), Register32
-    PERF_UNK2   = irange(0x740, 8, 4), Register32
+    PERF_UNK1 = irange(0x720, 8, 4), Register32
+    PERF_UNK2 = irange(0x740, 8, 4), Register32
 
-    PERF_TLB_MISS       = 0x760, Register32
-    PERF_TLB_FILL       = 0x764, Register32
-    PERF_TLB_HIT        = 0x768, Register32
-    PERF_ST_MISS        = 0x770, Register32
-    PERF_ST_FILL        = 0x774, Register32
-    PERF_ST_HIT         = 0x778, Register32
+    PERF_TLB_MISS = 0x760, Register32
+    PERF_TLB_FILL = 0x764, Register32
+    PERF_TLB_HIT = 0x768, Register32
+    PERF_ST_MISS = 0x770, Register32
+    PERF_ST_FILL = 0x774, Register32
+    PERF_ST_HIT = 0x778, Register32
     # hwrev 1 doesn't have these
-    PERF_CTC_MISS       = 0x780, Register32
-    PERF_CTC_FILL       = 0x784, Register32
-    PERF_CTC_HIT        = 0x788, Register32
+    PERF_CTC_MISS = 0x780, Register32
+    PERF_CTC_FILL = 0x784, Register32
+    PERF_CTC_HIT = 0x788, Register32
 
-    UNK_TUNABLES    = irange(0x800, 256, 4), Register32
+    UNK_TUNABLES = irange(0x800, 256, 4), Register32
 
-    ENABLE_STREAMS  = irange(0xc00, 8, 4), Register32
-    DISABLE_STREAMS = irange(0xc20, 8, 4), Register32
+    ENABLE_STREAMS = irange(0xC00, 8, 4), Register32
+    DISABLE_STREAMS = irange(0xC20, 8, 4), Register32
 
-    TCR             = irange(0x1000, 256, 4), R_TCR
-    TTBR            = irange(0x1400, 256, 4), R_TTBR
+    TCR = irange(0x1000, 256, 4), R_TCR
+    TTBR = irange(0x1400, 256, 4), R_TTBR
 
 
 class DART8110(Reloadable):
@@ -249,7 +262,7 @@ class DART8110(Reloadable):
     L2_OFF = 14
 
     IDX_BITS = 11
-    Lx_SIZE = (1 << IDX_BITS)
+    Lx_SIZE = 1 << IDX_BITS
     IDX_MASK = Lx_SIZE - 1
 
     def __init__(self, iface, regs, util=None):
@@ -260,7 +273,7 @@ class DART8110(Reloadable):
 
         enabled_streams = 0
         for i in range(8):
-            enabled_streams |= regs.ENABLE_STREAMS[i].val << 32*i
+            enabled_streams |= regs.ENABLE_STREAMS[i].val << 32 * i
         self.enabled_streams = enabled_streams
 
     @classmethod
@@ -275,8 +288,8 @@ class DART8110(Reloadable):
             return
 
         if not (self.enabled_streams & (1 << stream)):
-            self.enabled_streams |= (1 << stream)
-            self.regs.ENABLE_STREAMS[stream // 32].val |= (1 << (stream % 32))
+            self.enabled_streams |= 1 << stream
+            self.regs.ENABLE_STREAMS[stream // 32].val |= 1 << (stream % 32)
 
         tcr = self.regs.TCR[stream].reg
 
@@ -316,8 +329,7 @@ class DART8110(Reloadable):
                 if not l0pte.VALID:
                     l1addr = self.u.memalign(self.PAGE_SIZE, self.PAGE_SIZE)
                     self.pt_cache[l1addr] = [0] * self.Lx_SIZE
-                    l0pte = PTE(
-                        OFFSET=l1addr >> self.PAGE_BITS, VALID=1)
+                    l0pte = PTE(OFFSET=l1addr >> self.PAGE_BITS, VALID=1)
                     l0[l0idx] = l0pte.value
                     dirty.add(ttbr.ADDR << self.PAGE_BITS)
                 else:
@@ -332,8 +344,7 @@ class DART8110(Reloadable):
             if not l1pte.VALID:
                 l2addr = self.u.memalign(self.PAGE_SIZE, self.PAGE_SIZE)
                 self.pt_cache[l2addr] = [0] * self.Lx_SIZE
-                l1pte = PTE(
-                    OFFSET=l2addr >> self.PAGE_BITS, VALID=1)
+                l1pte = PTE(OFFSET=l2addr >> self.PAGE_BITS, VALID=1)
                 l1[l1idx] = l1pte.value
                 dirty.add(l1page << self.PAGE_BITS)
             else:
@@ -343,8 +354,8 @@ class DART8110(Reloadable):
             cached, l2 = self.get_pt(l2addr)
             l2idx = (page >> self.L2_OFF) & self.IDX_MASK
             self.pt_cache[l2addr][l2idx] = PTE(
-                SP_START=0, SP_END=0xfff,
-                OFFSET=paddr >> self.PAGE_BITS, VALID=1).value
+                SP_START=0, SP_END=0xFFF, OFFSET=paddr >> self.PAGE_BITS, VALID=1
+            ).value
 
         for page in dirty:
             self.flush_pt(page)
@@ -363,9 +374,9 @@ class DART8110(Reloadable):
             raise Exception(f"Unknown DART mode {tcr}")
 
         if tcr.FOUR_LEVELS:
-            start = start & 0xfff_ffff_ffff
+            start = start & 0xFFF_FFFF_FFFF
         else:
-            start = start & 0xfffffffff
+            start = start & 0xFFFFFFFFF
 
         start_page = align_down(start, self.PAGE_SIZE)
         start_off = start - start_page
@@ -421,8 +432,9 @@ class DART8110(Reloadable):
                 ranges.append((page, self.PAGE_SIZE))
                 continue
             laddr, lsize = ranges[-1]
-            if ((page is None and laddr is None) or
-                (page is not None and laddr == (page - lsize))):
+            if (page is None and laddr is None) or (
+                page is not None and laddr == (page - lsize)
+            ):
                 ranges[-1] = laddr, lsize + self.PAGE_SIZE
             else:
                 ranges.append((page, self.PAGE_SIZE))
@@ -430,8 +442,10 @@ class DART8110(Reloadable):
         ranges[-1] = (ranges[-1][0], ranges[-1][1] - self.PAGE_SIZE + end_size)
 
         if start_off:
-            ranges[0] = (ranges[0][0] + start_off if ranges[0][0] else None,
-                         ranges[0][1] - start_off)
+            ranges[0] = (
+                ranges[0][0] + start_off if ranges[0][0] else None,
+                ranges[0][1] - start_off,
+            )
 
         return ranges
 
@@ -440,13 +454,18 @@ class DART8110(Reloadable):
         if addr not in self.pt_cache or uncached:
             cached = False
             self.pt_cache[addr] = list(
-                struct.unpack(f"<{self.Lx_SIZE}Q", self.iface.readmem(addr, self.PAGE_SIZE)))
+                struct.unpack(
+                    f"<{self.Lx_SIZE}Q", self.iface.readmem(addr, self.PAGE_SIZE)
+                )
+            )
 
         return cached, self.pt_cache[addr]
 
     def flush_pt(self, addr):
         assert addr in self.pt_cache
-        self.iface.writemem(addr, struct.pack(f"<{self.Lx_SIZE}Q", *self.pt_cache[addr]))
+        self.iface.writemem(
+            addr, struct.pack(f"<{self.Lx_SIZE}Q", *self.pt_cache[addr])
+        )
 
     def initialize(self):
         for i in range(15):
@@ -454,11 +473,11 @@ class DART8110(Reloadable):
         self.regs.TCR[15].reg = R_TCR(BYPASS_DART=1)
 
         for i in range(16):
-            self.regs.TTBR[i].reg = R_TTBR(VALID = 0)
+            self.regs.TTBR[i].reg = R_TTBR(VALID=0)
 
         # self.regs.ERROR.val = 0xffffffff
         # self.regs.UNK1.val = 0
-        self.regs.DISABLE_STREAMS[0].val = 0xffff
+        self.regs.DISABLE_STREAMS[0].val = 0xFFFF
         self.enabled_streams = 0
 
         self.invalidate_streams()
@@ -466,10 +485,12 @@ class DART8110(Reloadable):
     def show_error(self):
         if self.regs.ERROR.reg.FLAG:
             print(f"ERROR: {self.regs.ERROR.reg!s}")
-            print(f"ADDR: {self.regs.ERROR_ADDR_HI.val:#x}:{self.regs.ERROR_ADDR_LO.val:#x}")
+            print(
+                f"ADDR: {self.regs.ERROR_ADDR_HI.val:#x}:{self.regs.ERROR_ADDR_LO.val:#x}"
+            )
             self.regs.ERROR.val = 0x80000004
 
-    def invalidate_streams(self, streams=0xffff):
+    def invalidate_streams(self, streams=0xFFFF):
         for sid in range(256):
             if streams & (1 << sid):
                 self.regs.TLB_OP.val = R_TLB_OP(STREAM=sid, OP=1)
@@ -484,14 +505,31 @@ class DART8110(Reloadable):
         def print_block(base, pte, start, last):
             pgcount = last - start
             pte.OFFSET -= pgcount
-            print(indent + "    page (%4d): %09x ... %09x -> %016x [%d%d%d%d]" % (
-                    start, base + start*0x4000, base + (start+1)*0x4000,
+            print(
+                indent
+                + "    page (%4d): %09x ... %09x -> %016x [%d%d%d%d]"
+                % (
+                    start,
+                    base + start * 0x4000,
+                    base + (start + 1) * 0x4000,
                     pte.OFFSET << self.PAGE_BITS,
-                    pte.RDPROT, pte.WRPROT, pte.UNCACHABLE, pte.VALID))
+                    pte.RDPROT,
+                    pte.WRPROT,
+                    pte.UNCACHABLE,
+                    pte.VALID,
+                )
+            )
             if start < last:
-                print(indent + "     ==> (%4d):           ... %09x -> %016x size: %08x" % (
-                    last, base + (last+1)*0x4000,
-                    (pte.OFFSET + pgcount - 1) << self.PAGE_BITS, pgcount << self.PAGE_BITS))
+                print(
+                    indent
+                    + "     ==> (%4d):           ... %09x -> %016x size: %08x"
+                    % (
+                        last,
+                        base + (last + 1) * 0x4000,
+                        (pte.OFFSET + pgcount - 1) << self.PAGE_BITS,
+                        pgcount << self.PAGE_BITS,
+                    )
+                )
 
         cached, tbl = self.get_pt(l1_addr)
 
@@ -541,13 +579,26 @@ class DART8110(Reloadable):
                 off = self.L0_OFF
             else:
                 off = self.L1_OFF
-            print(indent + "  table (%d): %09x ... %09x -> %016x [%d%d%d%d]" % (
-                i, base + (i << off), base + ((i+1) << off),
-                pte.OFFSET << self.PAGE_BITS,
-                pte.RDPROT, pte.WRPROT, pte.UNCACHABLE, pte.VALID))
+            print(
+                indent
+                + "  table (%d): %09x ... %09x -> %016x [%d%d%d%d]"
+                % (
+                    i,
+                    base + (i << off),
+                    base + ((i + 1) << off),
+                    pte.OFFSET << self.PAGE_BITS,
+                    pte.RDPROT,
+                    pte.WRPROT,
+                    pte.UNCACHABLE,
+                    pte.VALID,
+                )
+            )
             if four_levels:
-                self.dump_table(base + (i << off), pte.OFFSET << self.PAGE_BITS,
-                                indent=indent+"  ")
+                self.dump_table(
+                    base + (i << off),
+                    pte.OFFSET << self.PAGE_BITS,
+                    indent=indent + "  ",
+                )
             else:
                 self.dump_table2(base + (i << off), pte.OFFSET << self.PAGE_BITS)
 

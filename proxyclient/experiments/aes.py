@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: MIT
-import sys, pathlib
+import pathlib
+import sys
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
+from m1n1.hw.aes import *
+from m1n1.hw.dart import DART
 from m1n1.setup import *
 from m1n1.shell import run_shell
-from m1n1.hw.dart import DART
-from m1n1.hw.aes import *
+
 
 def aes_set_custom_key(
     aes,

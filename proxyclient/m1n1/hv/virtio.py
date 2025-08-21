@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: MIT
-from construct import Struct, Int8ul, Int16ul, Int32sl, Int32ul, Int64ul
-from subprocess import Popen, PIPE
+import os
 import pathlib
 import struct
-import os
 import sys
+from subprocess import PIPE, Popen
+
+from construct import Int8ul, Int16ul, Int32sl, Int32ul, Int64ul, Struct
 
 from ..utils import *
 
@@ -18,9 +19,11 @@ VirtioConfig = Struct(
     "verbose" / Int8ul,
 )
 
+
 class VirtioDescFlags(Register16):
     WRITE = 1
-    NEXT  = 0
+    NEXT = 0
+
 
 VirtioDesc = Struct(
     "addr" / Int64ul,
@@ -33,13 +36,14 @@ VirtioExcInfo = Struct(
     "devbase" / Int64ul,
     "qu" / Int16ul,
     "idx" / Int16ul,
-    "pad" / Int32ul, 
+    "pad" / Int32ul,
     "descbase" / Int64ul,
 )
 
+
 class VirtioDev:
     def __init__(self):
-        self.base, self.hv = None, None # assigned by HV object
+        self.base, self.hv = None, None  # assigned by HV object
 
     def read_buf(self, desc):
         return self.hv.iface.readmem(desc.addr, desc.len)
@@ -64,6 +68,7 @@ class VirtioDev:
     def feats(self):
         return 0
 
+
 class Virtio9PTransport(VirtioDev):
     def __init__(self, tag="m1n1", root=None):
         p_stdin, self.fin = os.pipe()
@@ -74,13 +79,20 @@ class Virtio9PTransport(VirtioDev):
             self.tag = tag.encode("ascii")
         else:
             self.tag = tag
-        self.p = Popen([
-            "u9fs",
-            "-a", "none", # no auth
-            "-n", # not a network conn
-            "-u", os.getlogin(), # single user
-            root,
-        ], stdin=p_stdin, stdout=p_stdout, stderr=sys.stderr)
+        self.p = Popen(
+            [
+                "u9fs",
+                "-a",
+                "none",  # no auth
+                "-n",  # not a network conn
+                "-u",
+                os.getlogin(),  # single user
+                root,
+            ],
+            stdin=p_stdin,
+            stdout=p_stdout,
+            stderr=sys.stderr,
+        )
 
     @property
     def config_data(self):
@@ -122,8 +134,8 @@ class Virtio9PTransport(VirtioDev):
         resplen = len(resp)
 
         while len(resp):
-            self.hv.iface.writemem(head.addr, resp[:head.len])
-            resp = resp[head.len:]
+            self.hv.iface.writemem(head.addr, resp[: head.len])
+            resp = resp[head.len :]
             if not head.flags.NEXT:
                 break
             head = self.read_desc(ctx, head.next)

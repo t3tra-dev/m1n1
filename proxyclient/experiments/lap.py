@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-import sys, pathlib, time, random, array
+import array
+import pathlib
+import random
+import sys
+import time
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 from m1n1.setup import *
+
 from m1n1 import asm
 
 PAGE_SIZE = 16384
@@ -39,13 +45,14 @@ for i in range(ITERS - 1):
 print(f"Seq data buf: {seq_data_buf:#x}")
 print(f"Random data buf: {random_data_buf:#x}")
 
-iface.writemem(seq_data_buf, array.array('I', seq_data).tobytes())
-iface.writemem(random_data_buf, array.array('I', random_data).tobytes())
+iface.writemem(seq_data_buf, array.array("I", seq_data).tobytes())
+iface.writemem(random_data_buf, array.array("I", random_data).tobytes())
 
 freq = u.mrs(CNTFRQ_EL0)
 code = u.malloc(0x1000)
 
-util = asm.ARMAsm(f"""
+util = asm.ARMAsm(
+    f"""
 test:
     mov x6, x2
     mov x5, x0
@@ -85,7 +92,9 @@ test:
 
     mov x0, x7
     ret
-""", code)
+""",
+    code,
+)
 iface.writemem(code, util.data)
 p.dc_cvau(code, len(util.data))
 p.ic_ivau(code, len(util.data))
@@ -96,14 +105,17 @@ p.cpufreq_init()
 p.smp_start_secondaries()
 p.smp_set_wfe_mode(False)
 
+
 def cpu_call(cpu, x, *args):
     return p.smp_call_sync(cpu, x | REGION_RX_EL1, *args)
+
 
 def init_core(cpu):
     p.mmu_init_secondary(cpu)
 
     def mrs(x):
         return u.mrs(x, call=lambda x, *args: cpu_call(cpu, x, *args))
+
     def msr(x, v):
         u.msr(x, v, call=lambda x, *args: cpu_call(cpu, x, *args))
 
@@ -117,9 +129,9 @@ def init_core(cpu):
 
     # Enable PMU
     v = mrs(PMCR0_EL1)
-    v |= 1 | (1<<30)
+    v |= 1 | (1 << 30)
     msr(PMCR0_EL1, v)
-    msr(PMCR1_EL1, 0xffffffffffffffff)
+    msr(PMCR1_EL1, 0xFFFFFFFFFFFFFFFF)
 
     v = mrs(CNTKCTL_EL1)
     v |= 3
@@ -127,11 +139,13 @@ def init_core(cpu):
 
     # Enable user cache ops
     v = mrs(SCTLR_EL1)
-    v |= (1 << 26)
+    v |= 1 << 26
     msr(SCTLR_EL1, v)
+
 
 def cpu_msr(cpu, x, v):
     u.msr(x, v, call=lambda x, *args: cpu_call(cpu, x, *args))
+
 
 init_core(TEST_ECORE)
 init_core(TEST_PCORE)
@@ -141,9 +155,11 @@ v = u.mrs(EHID4_EL1)
 v &= ~(1 << 11)
 u.msr(EHID4_EL1, v)
 
+
 def test_cpu(cpu, buf, iters):
     elapsed = p.smp_call_sync(cpu, util.test | REGION_RX_EL1, buf, iters, REPETITIONS)
     return elapsed / iters / REPETITIONS
+
 
 def run_tests():
     a = test_cpu(TEST_ECORE, seq_data_buf, ITERS)
@@ -153,9 +169,10 @@ def run_tests():
     print(f"    ECore seq: {a:.02f}, ECore random: {b:.02f}")
     print(f"    PCore seq: {c:.02f}, PCore random: {d:.02f}")
 
+
 print("Testing with SSBS=1 (load/store speculation permitted)")
 for cpu in (TEST_ECORE, TEST_PCORE):
-    cpu_msr(cpu, SSBS, 1<<12)
+    cpu_msr(cpu, SSBS, 1 << 12)
 
 run_tests()
 print("Testing with SSBS=0 (load/store speculation disallowed)")

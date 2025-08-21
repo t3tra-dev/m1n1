@@ -1,17 +1,22 @@
 # SPDX-License-Identifier: MIT
 import time
+
 from construct import *
+
 from ..afk.epic import *
 from .ipc import *
+
 
 # spuapp
 class AOPSPUAppService(EPICService):
     NAME = "SPUApp"
     SHORT = "spuapp"
 
+
 class AOPSPUAppI2CService(EPICService):
     NAME = "i2c"
     SHORT = "i2c"
+
 
 class AOPSPUAppEndpoint(EPICEndpoint):
     SHORT = "spuapp"
@@ -20,10 +25,12 @@ class AOPSPUAppEndpoint(EPICEndpoint):
         AOPSPUAppI2CService,
     ]
 
+
 # accel
 class AOPAccelService(EPICService):
     NAME = "accel"
     SHORT = "accel"
+
 
 class AOPAccelEndpoint(EPICEndpoint):
     SHORT = "accel"
@@ -31,10 +38,12 @@ class AOPAccelEndpoint(EPICEndpoint):
         AOPAccelService,
     ]
 
+
 # gyro
 class AOPGyroService(EPICService):
     NAME = "gyro"
     SHORT = "gyro"
+
 
 class AOPGyroEndpoint(EPICEndpoint):
     SHORT = "gyro"
@@ -45,15 +54,17 @@ class AOPGyroEndpoint(EPICEndpoint):
     def start_queues(self):
         pass  # don't init gyro ep (we don't have one)
 
+
 # als
 class AOPALSService(EPICService):
     NAME = "als"
     SHORT = "als"
 
-    @report_handler(0xc4, ALSLuxReport)
+    @report_handler(0xC4, ALSLuxReport)
     def handle_lux(self, seq, fd, rep):
         self.log(rep)
         return True
+
 
 class AOPALSEndpoint(EPICEndpoint):
     SHORT = "als"
@@ -70,10 +81,12 @@ class AOPALSEndpoint(EPICEndpoint):
     def send_cmd(self, call, chan="als"):
         return super(AOPALSEndpoint, self).send_cmd(chan, call)
 
+
 # wakehint
 class AOPWakehintService(EPICService):
     NAME = "wakehint"
     SHORT = "wakehint"
+
 
 class AOPWakehintEndpoint(EPICEndpoint):
     SHORT = "wakehint"
@@ -81,10 +94,12 @@ class AOPWakehintEndpoint(EPICEndpoint):
         AOPWakehintService,
     ]
 
+
 # unk26
 class AOPUNK26Service(EPICService):
     NAME = "unk26"
     SHORT = "unk26"
+
 
 class AOPUNK26Endpoint(EPICEndpoint):
     SHORT = "unk26"
@@ -92,10 +107,12 @@ class AOPUNK26Endpoint(EPICEndpoint):
         AOPUNK26Service,
     ]
 
+
 # audio
 class AOPAudioService(EPICService):
     NAME = "aop-audio"
     SHORT = "audio"
+
 
 class AOPAudioEndpoint(EPICEndpoint):
     SHORT = "audio"
@@ -118,9 +135,11 @@ class AOPAudioEndpoint(EPICEndpoint):
     def send_notifycmd(self, type, data, chan="aop-audio", **kwargs):
         return super(AOPAudioEndpoint, self).send_notifycmd(chan, type, data, **kwargs)
 
+
 class AOPVoiceTriggerService(EPICService):
     NAME = "aop-voicetrigger"
     SHORT = "voicetrigger"
+
 
 class AOPVoiceTriggerEndpoint(EPICEndpoint):
     SHORT = "voicetrigger"
@@ -138,4 +157,6 @@ class AOPVoiceTriggerEndpoint(EPICEndpoint):
         return super(AOPVoiceTriggerEndpoint, self).send_cmd(chan, type, data, **kwargs)
 
     def send_notifycmd(self, type, data, chan="aop-voicetrigger", **kwargs):
-        return super(AOPVoiceTriggerEndpoint, self).send_notifycmd(chan, type, data, **kwargs)
+        return super(AOPVoiceTriggerEndpoint, self).send_notifycmd(
+            chan, type, data, **kwargs
+        )

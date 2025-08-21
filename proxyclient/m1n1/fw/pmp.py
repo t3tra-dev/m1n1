@@ -2,68 +2,81 @@
 import struct
 
 from ..utils import *
-
 from .asc import StandardASC
 from .asc.base import *
+
 
 class PMPMessage(Register64):
     TYPE = 56, 44
 
+
 class PMP_Startup(PMPMessage):
     TYPE = 56, 44, Constant(0x00)
+
 
 class PMP_Configure(PMPMessage):
     TYPE = 56, 44, Constant(0x10)
     DVA = 47, 0
 
+
 class PMP_Configure_Ack(PMPMessage):
     TYPE = 56, 44, Constant(0x20)
     UNK = 47, 0
+
 
 class PMP_Init1(PMPMessage):
     TYPE = 56, 44, Constant(0x200)
     UNK1 = 43, 16
     UNK2 = 15, 0
 
+
 class PMP_Init1_Ack(PMPMessage):
     TYPE = 56, 44, Constant(0x201)
     UNK1 = 43, 16
     UNK2 = 15, 0
+
 
 class PMP_Init2(PMPMessage):
     TYPE = 56, 44, Constant(0x202)
     UNK1 = 43, 16
     UNK2 = 15, 0
 
+
 class PMP_Init2_Ack(PMPMessage):
     TYPE = 56, 44, Constant(0x203)
     UNK1 = 43, 16
     UNK2 = 15, 0
-    
+
+
 class PMP_Unk(PMPMessage):
     TYPE = 56, 44, Constant(0x100)
     UNK1 = 43, 16
     UNK2 = 15, 0
+
 
 class PMP_Unk_Ack(PMPMessage):
     TYPE = 56, 44, Constant(0x110)
     UNK1 = 43, 16
     UNK2 = 15, 0
 
+
 class PMP_DevPwr(PMPMessage):
-    TYPE = 56, 44, Constant(0x20e)
+    TYPE = 56, 44, Constant(0x20E)
     DEV = 31, 16
     STATE = 15, 0
+
 
 class PMP_DevPwr_Sync(PMPMessage):
     TYPE = 56, 44, Constant(0x208)
     DEV = 31, 16
     STATE = 15, 0
 
+
 class PMP_DevPwr_Ack(PMPMessage):
     TYPE = 56, 44, Constant(0x209)
     DEV = 31, 16
     STATE = 15, 0
+
 
 class PMPEndpoint(ASCBaseEndpoint):
     BASE_MESSAGE = PMPMessage
@@ -82,7 +95,7 @@ class PMPEndpoint(ASCBaseEndpoint):
         self.log("Starting up")
 
         self.shmem, self.shmem_dva = self.asc.ioalloc(0x10000)
-        
+
         self.send_init_config()
         return True
 
@@ -90,11 +103,11 @@ class PMPEndpoint(ASCBaseEndpoint):
         self.asc.p.memset32(self.shmem, 0, 0x10000)
         dram_config = self.asc.u.adt["arm-io/pmp/iop-pmp-nub"].energy_model_dram_configs
         self.asc.iface.writemem(self.shmem + 0x2000, dram_config)
-        
+
         node = self.asc.u.adt["arm-io/pmp"]
-        
+
         maps = []
-        dva = 0xc0000000
+        dva = 0xC0000000
         for i in range(3, len(node.reg)):
             addr, size = node.get_reg(i)
             if size == 0:
@@ -108,7 +121,7 @@ class PMPEndpoint(ASCBaseEndpoint):
 
         chexdump(b"".join(maps))
 
-        self.asc.iface.writemem(self.shmem + 0xe000, b"".join(maps))
+        self.asc.iface.writemem(self.shmem + 0xE000, b"".join(maps))
         self.send(PMP_Configure(DVA=self.shmem_dva))
 
         while not self.init_complete:
@@ -121,7 +134,7 @@ class PMPEndpoint(ASCBaseEndpoint):
 
         props = self.asc.iface.readmem(self.shmem, 0x2000)
         devinfo = self.asc.iface.readmem(self.shmem + 0x4000, 0x1000)
-        status = self.asc.iface.readmem(self.shmem + 0xc000, 0x100)
+        status = self.asc.iface.readmem(self.shmem + 0xC000, 0x100)
 
         print("PMP Props:")
         chexdump(props)
@@ -138,7 +151,7 @@ class PMPEndpoint(ASCBaseEndpoint):
         while not self.init2_acked:
             self.asc.work()
 
-        self.send(PMP_Unk(UNK1=0x3bc, UNK2=2))
+        self.send(PMP_Unk(UNK1=0x3BC, UNK2=2))
         while not self.unk_acked:
             self.asc.work()
 

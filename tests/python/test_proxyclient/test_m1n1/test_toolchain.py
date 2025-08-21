@@ -3,14 +3,11 @@
 
 import os
 import shutil
-
 from posix import uname_result
 
 import pytest
 
-from proxyclient.m1n1.toolchain import LLVMResolver
-from proxyclient.m1n1.toolchain import BrewLLVMResolver
-from proxyclient.m1n1.toolchain import Toolchain
+from proxyclient.m1n1.toolchain import BrewLLVMResolver, LLVMResolver, Toolchain
 
 
 class TestLLVMResolver:
@@ -158,7 +155,10 @@ class TestToolchain:
                 f"expected ({u.sysname}, {u.machine}) got ({host.sysname}, {host.machine})"
             )
 
-        if os.environ.get("USE_CLANG", default="0") == "1" and expected["use_clang"] is False:
+        if (
+            os.environ.get("USE_CLANG", default="0") == "1"
+            and expected["use_clang"] is False
+        ):
             pytest.skip("USE_CLANG is set while fixture targets LLVM")
 
         toolchain = Toolchain(u)

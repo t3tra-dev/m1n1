@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 
 from enum import IntEnum
+
 from m1n1.utils import *
 
 
@@ -219,9 +220,9 @@ class Dwc3CoreRegs(RegMap):
     DWC3_GFLADJ = 0x630, Register32
     DWC3_GHWPARAMS9 = 0x680, Register32
 
-    DWC3_D38 = 0xd38, Register32
-    DWC3_D3C = 0xd3c, Register32
-    DWC3_D40 = 0xd40, Register32
+    DWC3_D38 = 0xD38, Register32
+    DWC3_D3C = 0xD3C, Register32
+    DWC3_D40 = 0xD40, Register32
 
 
 class R_PIPEHANDLER_OVERRIDE(Register32):
